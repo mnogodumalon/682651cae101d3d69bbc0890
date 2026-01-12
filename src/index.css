@@ -43,37 +43,37 @@
 
 :root {
   --radius: 0.5rem;
-  --background: hsl(45 30% 97%);
-  --foreground: hsl(220 25% 18%);
+  --background: hsl(210 25% 97%);
+  --foreground: hsl(215 25% 15%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(220 25% 18%);
+  --card-foreground: hsl(215 25% 15%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(220 25% 18%);
-  --primary: hsl(215 50% 35%);
+  --popover-foreground: hsl(215 25% 15%);
+  --primary: hsl(215 60% 42%);
   --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(45 20% 94%);
-  --secondary-foreground: hsl(220 25% 25%);
-  --muted: hsl(45 15% 93%);
-  --muted-foreground: hsl(220 10% 45%);
-  --accent: hsl(35 85% 55%);
-  --accent-foreground: hsl(220 25% 15%);
-  --destructive: hsl(0 70% 55%);
-  --border: hsl(40 15% 88%);
-  --input: hsl(40 15% 92%);
-  --ring: hsl(215 50% 50%);
-  --chart-1: hsl(215 50% 45%);
-  --chart-2: hsl(35 80% 55%);
-  --chart-3: hsl(170 45% 45%);
-  --chart-4: hsl(280 40% 55%);
-  --chart-5: hsl(350 60% 55%);
-  --sidebar: hsl(45 30% 97%);
-  --sidebar-foreground: hsl(220 25% 18%);
-  --sidebar-primary: hsl(215 50% 35%);
+  --secondary: hsl(210 20% 94%);
+  --secondary-foreground: hsl(215 25% 15%);
+  --muted: hsl(210 20% 94%);
+  --muted-foreground: hsl(215 15% 50%);
+  --accent: hsl(215 60% 95%);
+  --accent-foreground: hsl(215 25% 15%);
+  --destructive: hsl(0 72% 51%);
+  --border: hsl(214 20% 88%);
+  --input: hsl(214 20% 88%);
+  --ring: hsl(215 60% 42%);
+  --chart-1: hsl(215 60% 42%);
+  --chart-2: hsl(152 55% 40%);
+  --chart-3: hsl(35 90% 55%);
+  --chart-4: hsl(280 50% 55%);
+  --chart-5: hsl(195 70% 45%);
+  --sidebar: hsl(0 0% 100%);
+  --sidebar-foreground: hsl(215 25% 15%);
+  --sidebar-primary: hsl(215 60% 42%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(35 85% 55%);
-  --sidebar-accent-foreground: hsl(220 25% 15%);
-  --sidebar-border: hsl(40 15% 88%);
-  --sidebar-ring: hsl(215 50% 50%);
+  --sidebar-accent: hsl(215 60% 95%);
+  --sidebar-accent-foreground: hsl(215 25% 15%);
+  --sidebar-border: hsl(214 20% 88%);
+  --sidebar-ring: hsl(215 60% 42%);
 }
 
 .dark {
@@ -116,6 +116,5 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Space Grotesk', sans-serif;
   }
 }

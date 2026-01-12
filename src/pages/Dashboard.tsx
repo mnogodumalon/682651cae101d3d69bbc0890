@@ -1,592 +1,813 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { Schichteinteilung, Mitarbeiterverwaltung, Schichtartenverwaltung, Unternehmensverwaltung } from '@/types/app';
-import { LivingAppsService, extractRecordId } from '@/services/livingAppsService';
+import type {
+  Schichteinteilung,
+  Mitarbeiterverwaltung,
+  Schichtartenverwaltung,
+  Unternehmensverwaltung
+} from '@/types/app';
+import { APP_IDS } from '@/types/app';
+import { LivingAppsService, extractRecordId, createRecordUrl } from '@/services/livingAppsService';
+import { format, parseISO, startOfWeek, endOfWeek, addDays, isToday, isFuture, isSameDay } from 'date-fns';
+import { de } from 'date-fns/locale';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { format, parseISO, isToday, startOfWeek, endOfWeek, isWithinInterval, addDays, isBefore, isAfter } from 'date-fns';
-import { de } from 'date-fns/locale';
-import { Users, Layers, Calendar, AlertCircle, Clock } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
+import {
+  Users,
+  Layers,
+  Calendar,
+  Plus,
+  Clock,
+  AlertCircle,
+  Building2
+} from 'lucide-react';
 
-// Enriched shift type with resolved relations
-interface EnrichedShift {
-  shift: Schichteinteilung;
-  employee: Mitarbeiterverwaltung | null;
-  shiftType: Schichtartenverwaltung | null;
-  company: Unternehmensverwaltung | null;
+// Types for enriched data
+interface EnrichedSchicht extends Schichteinteilung {
+  mitarbeiterName: string;
+  schichtartName: string;
+  unternehmenName: string;
 }
 
-// Loading skeleton component
-function LoadingState() {
-  return (
-    <div className="min-h-screen p-4 md:p-6 lg:p-8 animate-in fade-in duration-200">
-      <div className="max-w-[1400px] mx-auto">
-        {/* Header skeleton */}
-        <div className="mb-6">
-          <Skeleton className="h-7 w-40 mb-2" />
-          <Skeleton className="h-4 w-48" />
+interface WeekChartData {
+  day: string;
+  fullDay: string;
+  count: number;
+}
+
+// Form data type
+interface NewSchichtFormData {
+  datum: string;
+  mitarbeiter: string;
+  unternehmen: string;
+  schichtart: string;
+  beginn: string;
+  ende: string;
+  notiz: string;
+}
+
+export default function Dashboard() {
+  // Data states
+  const [schichten, setSchichten] = useState<Schichteinteilung[]>([]);
+  const [mitarbeiter, setMitarbeiter] = useState<Mitarbeiterverwaltung[]>([]);
+  const [schichtarten, setSchichtarten] = useState<Schichtartenverwaltung[]>([]);
+  const [unternehmen, setUnternehmen] = useState<Unternehmensverwaltung[]>([]);
+
+  // UI states
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState<NewSchichtFormData>({
+    datum: format(new Date(), 'yyyy-MM-dd'),
+    mitarbeiter: '',
+    unternehmen: '',
+    schichtart: '',
+    beginn: '06:00',
+    ende: '14:00',
+    notiz: ''
+  });
+
+  // Fetch all data on mount
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const [s, m, sa, u] = await Promise.all([
+          LivingAppsService.getSchichteinteilung(),
+          LivingAppsService.getMitarbeiterverwaltung(),
+          LivingAppsService.getSchichtartenverwaltung(),
+          LivingAppsService.getUnternehmensverwaltung()
+        ]);
+        setSchichten(s);
+        setMitarbeiter(m);
+        setSchichtarten(sa);
+        setUnternehmen(u);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Fehler beim Laden der Daten'));
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  // Create lookup maps
+  const mitarbeiterMap = useMemo(() => {
+    const map = new Map<string, Mitarbeiterverwaltung>();
+    mitarbeiter.forEach(m => map.set(m.record_id, m));
+    return map;
+  }, [mitarbeiter]);
+
+  const schichtartMap = useMemo(() => {
+    const map = new Map<string, Schichtartenverwaltung>();
+    schichtarten.forEach(s => map.set(s.record_id, s));
+    return map;
+  }, [schichtarten]);
+
+  const unternehmenMap = useMemo(() => {
+    const map = new Map<string, Unternehmensverwaltung>();
+    unternehmen.forEach(u => map.set(u.record_id, u));
+    return map;
+  }, [unternehmen]);
+
+  // Enrich shifts with related data
+  const enrichedSchichten = useMemo((): EnrichedSchicht[] => {
+    return schichten.map(s => {
+      const mitarbeiterId = extractRecordId(s.fields.zuweisung_mitarbeiter);
+      const schichtartId = extractRecordId(s.fields.zuweisung_schichtart);
+      const unternehmenId = extractRecordId(s.fields.zuweisung_unternehmen);
+
+      const ma = mitarbeiterId ? mitarbeiterMap.get(mitarbeiterId) : null;
+      const sa = schichtartId ? schichtartMap.get(schichtartId) : null;
+      const un = unternehmenId ? unternehmenMap.get(unternehmenId) : null;
+
+      return {
+        ...s,
+        mitarbeiterName: ma ? `${ma.fields.mitarbeiter_vorname || ''} ${ma.fields.mitarbeiter_nachname || ''}`.trim() : 'Unbekannt',
+        schichtartName: sa?.fields.schichtart_name || 'Unbekannt',
+        unternehmenName: un?.fields.unternehmen_name || 'Unbekannt'
+      };
+    });
+  }, [schichten, mitarbeiterMap, schichtartMap, unternehmenMap]);
+
+  // Today's shifts
+  const todayShifts = useMemo(() => {
+    const today = new Date();
+    return enrichedSchichten
+      .filter(s => {
+        if (!s.fields.zuweisung_datum) return false;
+        const shiftDate = parseISO(s.fields.zuweisung_datum);
+        return isToday(shiftDate);
+      })
+      .sort((a, b) => {
+        const timeA = a.fields.zuweisung_beginn || '00:00';
+        const timeB = b.fields.zuweisung_beginn || '00:00';
+        return timeA.localeCompare(timeB);
+      });
+  }, [enrichedSchichten]);
+
+  // Upcoming shifts (next 7 days, not today)
+  const upcomingShifts = useMemo(() => {
+    const today = new Date();
+    return enrichedSchichten
+      .filter(s => {
+        if (!s.fields.zuweisung_datum) return false;
+        const shiftDate = parseISO(s.fields.zuweisung_datum);
+        return isFuture(shiftDate) && !isToday(shiftDate);
+      })
+      .sort((a, b) => {
+        const dateA = a.fields.zuweisung_datum || '';
+        const dateB = b.fields.zuweisung_datum || '';
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        const timeA = a.fields.zuweisung_beginn || '00:00';
+        const timeB = b.fields.zuweisung_beginn || '00:00';
+        return timeA.localeCompare(timeB);
+      })
+      .slice(0, 10);
+  }, [enrichedSchichten]);
+
+  // Week chart data
+  const weekChartData = useMemo((): WeekChartData[] => {
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const days: WeekChartData[] = [];
+
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(weekStart, i);
+      const count = enrichedSchichten.filter(s => {
+        if (!s.fields.zuweisung_datum) return false;
+        return isSameDay(parseISO(s.fields.zuweisung_datum), day);
+      }).length;
+
+      days.push({
+        day: format(day, 'EEE', { locale: de }),
+        fullDay: format(day, 'EEEE', { locale: de }),
+        count
+      });
+    }
+
+    return days;
+  }, [enrichedSchichten]);
+
+  // This week's shifts count
+  const thisWeekCount = useMemo(() => {
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+
+    return enrichedSchichten.filter(s => {
+      if (!s.fields.zuweisung_datum) return false;
+      const date = parseISO(s.fields.zuweisung_datum);
+      return date >= weekStart && date <= weekEnd;
+    }).length;
+  }, [enrichedSchichten]);
+
+  // Handle form submission
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formData.mitarbeiter || !formData.datum) return;
+
+    setSubmitting(true);
+    try {
+      await LivingAppsService.createSchichteinteilungEntry({
+        zuweisung_datum: formData.datum,
+        zuweisung_mitarbeiter: formData.mitarbeiter ? createRecordUrl(APP_IDS.MITARBEITERVERWALTUNG, formData.mitarbeiter) : undefined,
+        zuweisung_unternehmen: formData.unternehmen ? createRecordUrl(APP_IDS.UNTERNEHMENSVERWALTUNG, formData.unternehmen) : undefined,
+        zuweisung_schichtart: formData.schichtart ? createRecordUrl(APP_IDS.SCHICHTARTENVERWALTUNG, formData.schichtart) : undefined,
+        zuweisung_beginn: formData.beginn,
+        zuweisung_ende: formData.ende,
+        zuweisung_notiz: formData.notiz || undefined
+      });
+
+      // Refresh data
+      const newSchichten = await LivingAppsService.getSchichteinteilung();
+      setSchichten(newSchichten);
+
+      // Reset form and close dialog
+      setFormData({
+        datum: format(new Date(), 'yyyy-MM-dd'),
+        mitarbeiter: '',
+        unternehmen: '',
+        schichtart: '',
+        beginn: '06:00',
+        ende: '14:00',
+        notiz: ''
+      });
+      setDialogOpen(false);
+    } catch (err) {
+      console.error('Fehler beim Erstellen der Schicht:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-5 w-64" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </div>
+          <Skeleton className="h-64" />
         </div>
-
-        {/* Hero skeleton */}
-        <Skeleton className="h-64 w-full mb-6 rounded-xl" />
-
-        {/* Stats row skeleton */}
-        <div className="flex gap-4 overflow-x-auto pb-2 mb-6">
-          <Skeleton className="h-20 w-28 flex-shrink-0 rounded-xl" />
-          <Skeleton className="h-20 w-28 flex-shrink-0 rounded-xl" />
-          <Skeleton className="h-20 w-28 flex-shrink-0 rounded-xl" />
-        </div>
-
-        {/* Upcoming section skeleton */}
-        <Skeleton className="h-48 w-full rounded-xl" />
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-// Error state component
-function ErrorState({ error, onRetry }: { error: Error; onRetry: () => void }) {
-  return (
-    <div className="min-h-screen p-4 md:p-6 lg:p-8 flex items-center justify-center">
-      <Alert variant="destructive" className="max-w-md">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Fehler beim Laden</AlertTitle>
-        <AlertDescription className="mt-2">
-          {error.message}
-          <button
-            onClick={onRetry}
-            className="block mt-3 text-sm underline hover:no-underline"
-          >
-            Erneut versuchen
-          </button>
-        </AlertDescription>
-      </Alert>
-    </div>
-  );
-}
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Fehler</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2">
+              <span>{error.message}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="w-fit"
+              >
+                Erneut versuchen
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
 
-// Empty state component
-function EmptyState() {
   return (
-    <div className="min-h-screen p-4 md:p-6 lg:p-8">
-      <div className="max-w-[1400px] mx-auto">
-        <header className="mb-6">
-          <h1 className="text-xl md:text-2xl font-semibold">Schichtplaner</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {format(new Date(), "EEEE, d. MMMM yyyy", { locale: de })}
-          </p>
-        </header>
-        <Card className="text-center py-12">
-          <CardContent>
-            <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-lg font-medium mb-2">Keine Schichten vorhanden</h2>
-            <p className="text-muted-foreground text-sm">
-              Es wurden noch keine Schichten eingetragen.
+    <div className="min-h-screen bg-background">
+      {/* Main content */}
+      <div className="p-4 md:p-6 pb-24 md:pb-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <header className="mb-6">
+            <h1 className="text-2xl font-semibold text-foreground">Schichtplaner</h1>
+            <p className="text-muted-foreground">
+              {format(new Date(), 'EEEE, d. MMMM yyyy', { locale: de })}
             </p>
-          </CardContent>
-        </Card>
+          </header>
+
+          {/* Desktop: Two column layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+            {/* Main column */}
+            <div className="space-y-6">
+              {/* Hero: Today's shifts */}
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-xl font-semibold">Heute</h2>
+                  <Badge variant="secondary" className="text-sm">
+                    {todayShifts.length}
+                  </Badge>
+                </div>
+
+                {todayShifts.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="py-8 text-center">
+                      <p className="text-muted-foreground">Keine Schichten heute</p>
+                      <Button
+                        variant="link"
+                        className="mt-2"
+                        onClick={() => setDialogOpen(true)}
+                      >
+                        Schicht hinzufügen
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {todayShifts.map((shift) => (
+                      <ShiftCard key={shift.record_id} shift={shift} />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Upcoming shifts */}
+              <section>
+                <h2 className="text-lg font-semibold mb-4">Kommende Schichten</h2>
+                {upcomingShifts.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="py-6 text-center">
+                      <p className="text-muted-foreground text-sm">
+                        Keine anstehenden Schichten
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">
+                    {upcomingShifts.map((shift) => (
+                      <UpcomingShiftRow key={shift.record_id} shift={shift} />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Weekly chart - Desktop only */}
+              <section className="hidden md:block">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base font-medium">
+                      Schichten diese Woche
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={weekChartData}>
+                          <XAxis
+                            dataKey="day"
+                            tick={{ fontSize: 12 }}
+                            stroke="hsl(215 15% 50%)"
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 12 }}
+                            stroke="hsl(215 15% 50%)"
+                            axisLine={false}
+                            tickLine={false}
+                            allowDecimals={false}
+                          />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (!active || !payload?.length) return null;
+                              const data = payload[0].payload as WeekChartData;
+                              return (
+                                <div className="bg-card border border-border rounded-md p-2 shadow-sm">
+                                  <p className="text-sm font-medium">{data.fullDay}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {data.count} Schicht{data.count !== 1 ? 'en' : ''}
+                                  </p>
+                                </div>
+                              );
+                            }}
+                          />
+                          <Bar
+                            dataKey="count"
+                            fill="hsl(215 60% 42%)"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            </div>
+
+            {/* Sidebar - Desktop */}
+            <aside className="hidden lg:block space-y-4">
+              {/* Primary action - Desktop */}
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="w-full h-12 text-base shadow-sm">
+                    <Plus className="mr-2 h-5 w-5" />
+                    Neue Schicht eintragen
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Neue Schicht eintragen</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="datum">Datum</Label>
+                      <Input
+                        id="datum"
+                        type="date"
+                        value={formData.datum}
+                        onChange={(e) => setFormData(prev => ({ ...prev, datum: e.target.value }))}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="mitarbeiter">Mitarbeiter</Label>
+                      <Select
+                        value={formData.mitarbeiter}
+                        onValueChange={(v) => setFormData(prev => ({ ...prev, mitarbeiter: v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Mitarbeiter auswählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mitarbeiter.map((m) => (
+                            <SelectItem key={m.record_id} value={m.record_id}>
+                              {m.fields.mitarbeiter_vorname} {m.fields.mitarbeiter_nachname}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="unternehmen">Unternehmen</Label>
+                      <Select
+                        value={formData.unternehmen}
+                        onValueChange={(v) => setFormData(prev => ({ ...prev, unternehmen: v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unternehmen auswählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {unternehmen.map((u) => (
+                            <SelectItem key={u.record_id} value={u.record_id}>
+                              {u.fields.unternehmen_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="schichtart">Schichtart</Label>
+                      <Select
+                        value={formData.schichtart}
+                        onValueChange={(v) => setFormData(prev => ({ ...prev, schichtart: v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Schichtart auswählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {schichtarten.map((s) => (
+                            <SelectItem key={s.record_id} value={s.record_id}>
+                              {s.fields.schichtart_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="beginn">Beginn</Label>
+                        <Input
+                          id="beginn"
+                          type="time"
+                          value={formData.beginn}
+                          onChange={(e) => setFormData(prev => ({ ...prev, beginn: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ende">Ende</Label>
+                        <Input
+                          id="ende"
+                          type="time"
+                          value={formData.ende}
+                          onChange={(e) => setFormData(prev => ({ ...prev, ende: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="notiz">Notiz (optional)</Label>
+                      <Textarea
+                        id="notiz"
+                        value={formData.notiz}
+                        onChange={(e) => setFormData(prev => ({ ...prev, notiz: e.target.value }))}
+                        placeholder="Zusätzliche Hinweise..."
+                        rows={2}
+                      />
+                    </div>
+
+                    <Button type="submit" className="w-full" disabled={submitting || !formData.mitarbeiter}>
+                      {submitting ? 'Wird gespeichert...' : 'Schicht speichern'}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              {/* Stats cards */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Mitarbeiter
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{mitarbeiter.length}</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Layers className="h-4 w-4" />
+                    Schichtarten
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{schichtarten.length}</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Diese Woche
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{thisWeekCount}</p>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
+
+          {/* Mobile: Stats as horizontal scroll */}
+          <section className="lg:hidden mt-6">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">
+              Schnellübersicht
+            </h3>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
+              <MiniStatCard
+                icon={Users}
+                value={mitarbeiter.length}
+                label="Mitarbeiter"
+              />
+              <MiniStatCard
+                icon={Layers}
+                value={schichtarten.length}
+                label="Schichtarten"
+              />
+              <MiniStatCard
+                icon={Calendar}
+                value={thisWeekCount}
+                label="Diese Woche"
+              />
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {/* Mobile: Fixed bottom button */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 pb-5 bg-background border-t border-border">
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="w-full h-13 text-base shadow-md">
+              <Plus className="mr-2 h-5 w-5" />
+              Neue Schicht eintragen
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Neue Schicht eintragen</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="datum-mobile">Datum</Label>
+                <Input
+                  id="datum-mobile"
+                  type="date"
+                  value={formData.datum}
+                  onChange={(e) => setFormData(prev => ({ ...prev, datum: e.target.value }))}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="mitarbeiter-mobile">Mitarbeiter</Label>
+                <Select
+                  value={formData.mitarbeiter}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, mitarbeiter: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Mitarbeiter auswählen..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mitarbeiter.map((m) => (
+                      <SelectItem key={m.record_id} value={m.record_id}>
+                        {m.fields.mitarbeiter_vorname} {m.fields.mitarbeiter_nachname}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="unternehmen-mobile">Unternehmen</Label>
+                <Select
+                  value={formData.unternehmen}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, unternehmen: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unternehmen auswählen..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unternehmen.map((u) => (
+                      <SelectItem key={u.record_id} value={u.record_id}>
+                        {u.fields.unternehmen_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="schichtart-mobile">Schichtart</Label>
+                <Select
+                  value={formData.schichtart}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, schichtart: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Schichtart auswählen..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {schichtarten.map((s) => (
+                      <SelectItem key={s.record_id} value={s.record_id}>
+                        {s.fields.schichtart_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="beginn-mobile">Beginn</Label>
+                  <Input
+                    id="beginn-mobile"
+                    type="time"
+                    value={formData.beginn}
+                    onChange={(e) => setFormData(prev => ({ ...prev, beginn: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ende-mobile">Ende</Label>
+                  <Input
+                    id="ende-mobile"
+                    type="time"
+                    value={formData.ende}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ende: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notiz-mobile">Notiz (optional)</Label>
+                <Textarea
+                  id="notiz-mobile"
+                  value={formData.notiz}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notiz: e.target.value }))}
+                  placeholder="Zusätzliche Hinweise..."
+                  rows={2}
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={submitting || !formData.mitarbeiter}>
+                {submitting ? 'Wird gespeichert...' : 'Schicht speichern'}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
 }
 
-// Stat card component
-function StatCard({ icon: Icon, value, label }: { icon: React.ElementType; value: number; label: string }) {
+// Shift card for today's shifts
+function ShiftCard({ shift }: { shift: EnrichedSchicht }) {
   return (
-    <Card className="flex-shrink-0 min-w-[100px] py-4 hover:shadow-md transition-shadow">
-      <CardContent className="flex items-center gap-3 p-0 px-4">
-        <div className="p-2 rounded-lg bg-muted">
-          <Icon className="h-4 w-4 text-muted-foreground" />
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="font-semibold text-foreground">{shift.mitarbeiterName}</p>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+              <Clock className="h-3.5 w-3.5" />
+              <span>
+                {shift.fields.zuweisung_beginn || '—'} - {shift.fields.zuweisung_ende || '—'}
+              </span>
+            </div>
+          </div>
+          {shift.schichtartName !== 'Unbekannt' && (
+            <Badge variant="secondary" className="text-xs">
+              {shift.schichtartName}
+            </Badge>
+          )}
         </div>
-        <div>
-          <div className="text-xl font-bold">{value}</div>
-          <div className="text-xs text-muted-foreground">{label}</div>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+          <Building2 className="h-3 w-3" />
+          <span>{shift.unternehmenName}</span>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-// Shift item component
-function ShiftItem({ enrichedShift, showDate = false }: { enrichedShift: EnrichedShift; showDate?: boolean }) {
-  const { shift, employee, shiftType } = enrichedShift;
-  const employeeName = employee
-    ? `${employee.fields.mitarbeiter_vorname || ''} ${employee.fields.mitarbeiter_nachname || ''}`.trim()
-    : 'Unbekannt';
-  const shiftTypeName = shiftType?.fields.schichtart_name || 'Schicht';
-  const startTime = shift.fields.zuweisung_beginn || '--:--';
-  const endTime = shift.fields.zuweisung_ende || '--:--';
+// Row for upcoming shifts
+function UpcomingShiftRow({ shift }: { shift: EnrichedSchicht }) {
+  const dateStr = shift.fields.zuweisung_datum
+    ? format(parseISO(shift.fields.zuweisung_datum), 'EEE, d. MMM', { locale: de })
+    : '—';
 
   return (
-    <div className="flex items-center justify-between py-3 border-b last:border-b-0 hover:bg-muted/30 transition-colors px-1 -mx-1 rounded">
-      <div className="flex-1 min-w-0">
-        {showDate && shift.fields.zuweisung_datum && (
-          <div className="text-xs text-muted-foreground mb-1">
-            {format(parseISO(shift.fields.zuweisung_datum), "EEEE, d. MMM", { locale: de })}
+    <Card className="hover:shadow-sm transition-shadow">
+      <CardContent className="p-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="text-sm font-medium text-muted-foreground w-24 shrink-0">
+            {dateStr}
           </div>
-        )}
-        <div className="font-medium truncate">{employeeName}</div>
-        <div className="flex items-center gap-2 mt-1">
-          <Badge variant="secondary" className="text-xs bg-accent/20 text-accent-foreground border-0">
-            {shiftTypeName}
-          </Badge>
+          <div>
+            <p className="font-medium text-sm">{shift.mitarbeiterName}</p>
+            <p className="text-xs text-muted-foreground">
+              {shift.fields.zuweisung_beginn || '—'} - {shift.fields.zuweisung_ende || '—'} · {shift.unternehmenName}
+            </p>
+          </div>
         </div>
-      </div>
-      <div className="text-sm text-muted-foreground flex items-center gap-1 ml-3">
-        <Clock className="h-3 w-3" />
-        {startTime} - {endTime}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
-// Employee avatar component
-function EmployeeAvatar({ employee }: { employee: Mitarbeiterverwaltung }) {
-  const firstName = employee.fields.mitarbeiter_vorname || '';
-  const lastName = employee.fields.mitarbeiter_nachname || '';
-  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || '?';
-  const fullName = `${firstName} ${lastName}`.trim() || 'Unbekannt';
-
+// Mini stat card for mobile horizontal scroll
+function MiniStatCard({
+  icon: Icon,
+  value,
+  label
+}: {
+  icon: React.ElementType;
+  value: number;
+  label: string
+}) {
   return (
-    <div className="flex items-center gap-3 py-2">
-      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-medium">
-        {initials}
-      </div>
-      <span className="text-sm">{fullName}</span>
-    </div>
-  );
-}
-
-export default function Dashboard() {
-  const [shifts, setShifts] = useState<Schichteinteilung[]>([]);
-  const [employees, setEmployees] = useState<Mitarbeiterverwaltung[]>([]);
-  const [shiftTypes, setShiftTypes] = useState<Schichtartenverwaltung[]>([]);
-  const [companies, setCompanies] = useState<Unternehmensverwaltung[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  // State for mobile "show all" toggle
-  const [showAllTodayShifts, setShowAllTodayShifts] = useState(false);
-
-  async function loadData() {
-    try {
-      setLoading(true);
-      setError(null);
-      const [shiftsData, employeesData, shiftTypesData, companiesData] = await Promise.all([
-        LivingAppsService.getSchichteinteilung(),
-        LivingAppsService.getMitarbeiterverwaltung(),
-        LivingAppsService.getSchichtartenverwaltung(),
-        LivingAppsService.getUnternehmensverwaltung(),
-      ]);
-      setShifts(shiftsData);
-      setEmployees(employeesData);
-      setShiftTypes(shiftTypesData);
-      setCompanies(companiesData);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unbekannter Fehler'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Create lookup maps
-  const employeeMap = useMemo(() => {
-    const map = new Map<string, Mitarbeiterverwaltung>();
-    employees.forEach(emp => map.set(emp.record_id, emp));
-    return map;
-  }, [employees]);
-
-  const shiftTypeMap = useMemo(() => {
-    const map = new Map<string, Schichtartenverwaltung>();
-    shiftTypes.forEach(st => map.set(st.record_id, st));
-    return map;
-  }, [shiftTypes]);
-
-  const companyMap = useMemo(() => {
-    const map = new Map<string, Unternehmensverwaltung>();
-    companies.forEach(c => map.set(c.record_id, c));
-    return map;
-  }, [companies]);
-
-  // Enrich shifts with related data
-  const enrichedShifts = useMemo((): EnrichedShift[] => {
-    return shifts.map(shift => {
-      const employeeId = extractRecordId(shift.fields.zuweisung_mitarbeiter);
-      const shiftTypeId = extractRecordId(shift.fields.zuweisung_schichtart);
-      const companyId = extractRecordId(shift.fields.zuweisung_unternehmen);
-
-      return {
-        shift,
-        employee: employeeId ? employeeMap.get(employeeId) || null : null,
-        shiftType: shiftTypeId ? shiftTypeMap.get(shiftTypeId) || null : null,
-        company: companyId ? companyMap.get(companyId) || null : null,
-      };
-    });
-  }, [shifts, employeeMap, shiftTypeMap, companyMap]);
-
-  // Today's shifts
-  const todayShifts = useMemo(() => {
-    const today = new Date();
-    return enrichedShifts
-      .filter(es => {
-        if (!es.shift.fields.zuweisung_datum) return false;
-        return isToday(parseISO(es.shift.fields.zuweisung_datum));
-      })
-      .sort((a, b) => {
-        const timeA = a.shift.fields.zuweisung_beginn || '99:99';
-        const timeB = b.shift.fields.zuweisung_beginn || '99:99';
-        return timeA.localeCompare(timeB);
-      });
-  }, [enrichedShifts]);
-
-  // This week's shifts count
-  const thisWeekShiftsCount = useMemo(() => {
-    const today = new Date();
-    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
-    const weekEnd = endOfWeek(today, { weekStartsOn: 1 }); // Sunday
-
-    return enrichedShifts.filter(es => {
-      if (!es.shift.fields.zuweisung_datum) return false;
-      const shiftDate = parseISO(es.shift.fields.zuweisung_datum);
-      return isWithinInterval(shiftDate, { start: weekStart, end: weekEnd });
-    }).length;
-  }, [enrichedShifts]);
-
-  // Upcoming shifts (next 7 days, excluding today)
-  const upcomingShifts = useMemo(() => {
-    const today = new Date();
-    const tomorrow = addDays(today, 1);
-    const nextWeek = addDays(today, 7);
-
-    return enrichedShifts
-      .filter(es => {
-        if (!es.shift.fields.zuweisung_datum) return false;
-        const shiftDate = parseISO(es.shift.fields.zuweisung_datum);
-        return !isBefore(shiftDate, tomorrow) && !isAfter(shiftDate, nextWeek);
-      })
-      .sort((a, b) => {
-        const dateA = a.shift.fields.zuweisung_datum || '';
-        const dateB = b.shift.fields.zuweisung_datum || '';
-        if (dateA !== dateB) return dateA.localeCompare(dateB);
-        const timeA = a.shift.fields.zuweisung_beginn || '99:99';
-        const timeB = b.shift.fields.zuweisung_beginn || '99:99';
-        return timeA.localeCompare(timeB);
-      });
-  }, [enrichedShifts]);
-
-  // Chart data for desktop - shifts per day this week
-  const weekChartData = useMemo(() => {
-    const today = new Date();
-    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
-    const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-
-    return days.map((day, index) => {
-      const date = addDays(weekStart, index);
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const count = enrichedShifts.filter(es =>
-        es.shift.fields.zuweisung_datum === dateStr
-      ).length;
-      return { name: day, schichten: count };
-    });
-  }, [enrichedShifts]);
-
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState error={error} onRetry={loadData} />;
-
-  // Determine how many shifts to show on mobile
-  const mobileVisibleTodayShifts = showAllTodayShifts ? todayShifts : todayShifts.slice(0, 4);
-  const hasMoreTodayShifts = todayShifts.length > 4;
-
-  return (
-    <div className="min-h-screen p-4 md:p-6 lg:p-8 animate-in fade-in duration-200">
-      <div className="max-w-[1400px] mx-auto">
-        {/* Header */}
-        <header className="mb-6">
-          <h1 className="text-xl md:text-2xl font-semibold">Schichtplaner</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {format(new Date(), "EEEE, d. MMMM yyyy", { locale: de })}
-          </p>
-        </header>
-
-        {/* Desktop: Two-column layout */}
-        <div className="hidden lg:grid lg:grid-cols-[65%_35%] lg:gap-6">
-          {/* Left Column */}
-          <div className="space-y-6">
-            {/* Hero: Today's Shifts */}
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium text-muted-foreground">
-                  Schichten heute
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-5xl font-bold text-primary mb-4">
-                  {todayShifts.length}
-                </div>
-                {todayShifts.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Keine Schichten heute geplant.</p>
-                ) : (
-                  <div className="divide-y">
-                    {todayShifts.map(es => (
-                      <ShiftItem key={es.shift.record_id} enrichedShift={es} />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Chart: Shifts this week */}
-            <Card className="shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium text-muted-foreground">
-                  Schichten diese Woche
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[200px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={weekChartData}>
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 12 }}
-                        stroke="hsl(220 10% 45%)"
-                        axisLine={{ stroke: 'hsl(40 15% 88%)' }}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12 }}
-                        stroke="hsl(220 10% 45%)"
-                        axisLine={{ stroke: 'hsl(40 15% 88%)' }}
-                        tickLine={false}
-                        allowDecimals={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(0 0% 100%)',
-                          border: '1px solid hsl(40 15% 88%)',
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                        }}
-                        labelStyle={{ color: 'hsl(220 25% 18%)', fontWeight: 500 }}
-                        cursor={{ fill: 'hsl(45 15% 93%)' }}
-                      />
-                      <Bar
-                        dataKey="schichten"
-                        fill="hsl(215 50% 35%)"
-                        radius={[4, 4, 0, 0]}
-                        name="Schichten"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Upcoming Shifts */}
-            <Card className="shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium text-muted-foreground">
-                  Kommende Schichten
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {upcomingShifts.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Keine weiteren Schichten in den nächsten 7 Tagen.</p>
-                ) : (
-                  <div className="divide-y">
-                    {upcomingShifts.slice(0, 10).map(es => (
-                      <ShiftItem key={es.shift.record_id} enrichedShift={es} showDate />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-6">
-            {/* Stats Cards */}
-            <Card className="shadow-sm py-4">
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">{employees.length}</div>
-                    <div className="text-xs text-muted-foreground">Mitarbeiter</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted">
-                    <Layers className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">{shiftTypes.length}</div>
-                    <div className="text-xs text-muted-foreground">Schichtarten</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">{thisWeekShiftsCount}</div>
-                    <div className="text-xs text-muted-foreground">Schichten diese Woche</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Team List */}
-            <Card className="shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium text-muted-foreground">
-                  Team ({employees.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {employees.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Keine Mitarbeiter vorhanden.</p>
-                ) : (
-                  <div className="max-h-[300px] overflow-y-auto divide-y">
-                    {employees
-                      .sort((a, b) => {
-                        const nameA = a.fields.mitarbeiter_nachname || '';
-                        const nameB = b.fields.mitarbeiter_nachname || '';
-                        return nameA.localeCompare(nameB);
-                      })
-                      .map(emp => (
-                        <EmployeeAvatar key={emp.record_id} employee={emp} />
-                      ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Company Info (if exists) */}
-            {companies.length > 0 && (
-              <Card className="shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-medium text-muted-foreground">
-                    Unternehmen
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {companies.map(company => (
-                    <div key={company.record_id} className="text-sm">
-                      <div className="font-medium">{company.fields.unternehmen_name || 'Unbekannt'}</div>
-                      {(company.fields.unternehmen_strasse || company.fields.unternehmen_ort) && (
-                        <div className="text-muted-foreground text-xs mt-1">
-                          {company.fields.unternehmen_strasse} {company.fields.unternehmen_hausnummer}
-                          {company.fields.unternehmen_strasse && company.fields.unternehmen_ort && ', '}
-                          {company.fields.unternehmen_plz} {company.fields.unternehmen_ort}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-
-        {/* Mobile Layout */}
-        <div className="lg:hidden space-y-4">
-          {/* Hero: Today's Shifts */}
-          <Card className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Schichten heute
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-5xl font-bold text-primary mb-4">
-                {todayShifts.length}
-              </div>
-              {todayShifts.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Keine Schichten heute.</p>
-              ) : (
-                <>
-                  <div className="divide-y">
-                    {mobileVisibleTodayShifts.map(es => (
-                      <ShiftItem key={es.shift.record_id} enrichedShift={es} />
-                    ))}
-                  </div>
-                  {hasMoreTodayShifts && !showAllTodayShifts && (
-                    <button
-                      onClick={() => setShowAllTodayShifts(true)}
-                      className="mt-3 text-sm text-primary hover:underline"
-                    >
-                      Alle {todayShifts.length} Schichten anzeigen
-                    </button>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats Row */}
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
-            <StatCard icon={Users} value={employees.length} label="Mitarbeiter" />
-            <StatCard icon={Layers} value={shiftTypes.length} label="Schichtarten" />
-            <StatCard icon={Calendar} value={thisWeekShiftsCount} label="Diese Woche" />
-          </div>
-
-          {/* Upcoming Shifts */}
-          <Card className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Kommende Schichten
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {upcomingShifts.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Keine weiteren Schichten geplant.</p>
-              ) : (
-                <div className="divide-y">
-                  {upcomingShifts.slice(0, 5).map(es => (
-                    <ShiftItem key={es.shift.record_id} enrichedShift={es} showDate />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Team Accordion */}
-          <Accordion type="single" collapsible>
-            <AccordionItem value="team" className="border rounded-xl bg-card px-4">
-              <AccordionTrigger className="text-sm font-medium text-muted-foreground hover:no-underline">
-                Team ({employees.length})
-              </AccordionTrigger>
-              <AccordionContent>
-                {employees.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Keine Mitarbeiter.</p>
-                ) : (
-                  <div className="divide-y">
-                    {employees
-                      .sort((a, b) => {
-                        const nameA = a.fields.mitarbeiter_nachname || '';
-                        const nameB = b.fields.mitarbeiter_nachname || '';
-                        return nameA.localeCompare(nameB);
-                      })
-                      .map(emp => (
-                        <EmployeeAvatar key={emp.record_id} employee={emp} />
-                      ))}
-                  </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </div>
-      </div>
-    </div>
+    <Card className="shrink-0 w-32">
+      <CardContent className="p-3">
+        <Icon className="h-4 w-4 text-muted-foreground mb-1" />
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </CardContent>
+    </Card>
   );
 }
