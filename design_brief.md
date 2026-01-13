@@ -1,180 +1,190 @@
-# Design Brief: Schichtplaner
+# Design Brief: Schichtplaner Dashboard
 
 ## 1. App Analysis
 
 ### What This App Does
-This is a shift planning system (Schichtplaner) that allows managers to schedule employee shifts across different companies and shift types. The system tracks shift assignments with date, time, employee, shift type, and company information.
+Schichtplaner is a workforce shift scheduling system for businesses. It manages employees, defines shift types (Frühschicht, Spätschicht, etc.), and assigns workers to specific shifts on specific dates. The core workflow is: define shift types → assign employees to shifts → track who works when.
 
 ### Who Uses This
-Shift managers or team leads who need to:
-- See who is working today and this week at a glance
-- Quickly assign new shifts to employees
-- Track shift coverage across different shift types
-- Manage schedules for potentially multiple companies
+Shift managers or small business owners who need a quick overview of daily staffing. They check the dashboard multiple times per day to see who's working, upcoming shifts, and to quickly add new shift assignments.
 
 ### The ONE Thing Users Care About Most
-**"Who is working today?"** - The manager needs to immediately see today's shift coverage when they open the app. They want to know at a glance which employees are scheduled, what shift types are covered, and if there are any gaps.
+**Today's shifts** - Who is working TODAY? This is what they check first thing every morning and throughout the day.
 
 ### Primary Actions (IMPORTANT!)
-1. **Neue Schicht eintragen** (Add new shift) - Primary Action Button - This is what managers do constantly
-2. View shift details
-3. Navigate between days/weeks
+1. **Neue Schicht eintragen** → Primary Action Button (add a shift assignment)
+2. View shift details by tapping on a shift
+3. See weekly overview
 
 ---
 
 ## 2. What Makes This Design Distinctive
 
 ### Visual Identity
-The design uses a deep indigo accent on a warm off-white base to create a professional, trustworthy feel appropriate for workforce management. The warmth of the background prevents the "sterile office software" feel while the indigo brings a modern, capable energy. The asymmetric layout with a prominent calendar week view immediately signals "scheduling app" without needing explanation.
+This dashboard uses a **professional, industrial aesthetic** that suits a workforce management tool. The cool slate-blue background creates a calm, serious tone appropriate for business operations. The warm amber accent color (#f59e0b tones) provides clear visual anchors for time-related elements and actions, subtly evoking the idea of clock faces and shift timing. Typography is clean and efficient - this is a tool, not a lifestyle app.
 
 ### Layout Strategy
-- **Hero element:** Today's shift summary card takes 65% of the top section with bold shift count and employee avatars
-- **Desktop split:** 60/40 left-heavy - main content (hero + weekly overview) on left, upcoming shifts list on right
-- **Visual tension:** The hero uses massive typography (48px shift count) while secondary stats are compact inline badges
-- **Mobile:** Hero dominates first viewport, then scrolls to compact daily timeline
+- **Hero element:** Today's shift timeline dominates the view - a tall, vertical list showing current and upcoming shifts with prominent time indicators
+- **Asymmetric layout** on desktop: 70/30 split with the shift timeline taking the larger portion, stats and quick actions in the narrower column
+- **Visual interest** created through:
+  - Large time stamps (24px bold) contrasting with smaller employee names (14px regular)
+  - Color-coded shift types using subtle background tints
+  - Generous vertical spacing between shift cards creating breathing room
+  - The hero section uses a slightly elevated card with subtle shadow to lift it from the page
 
 ### Unique Element
-The "Today's Coverage" hero card features a horizontal row of stacked employee initials (like Slack avatars) showing who's on shift today. This creates immediate visual recognition - managers know their team by face/initials. The indigo accent rings around active shifts create a subtle pulse of activity.
+**Shift time indicators** - Each shift displays its time range as a bold, monospace-styled badge on the left edge of the card, creating a visual "timeline ruler" effect. The current active shift has a pulsing amber dot indicator, making it immediately obvious who's working RIGHT NOW.
 
 ---
 
 ## 3. Theme & Colors
 
 ### Font
-- **Family:** Plus Jakarta Sans
-- **URL:** `https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap`
-- **Why this font:** Professional yet friendly geometric sans-serif. The rounded terminals soften the corporate feel while maintaining excellent readability. Weight range allows strong hierarchy from light labels to bold numbers.
+- **Family:** Space Grotesk
+- **URL:** `https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap`
+- **Why this font:** Space Grotesk has a technical, systematic feel perfect for scheduling and time management. Its geometric forms echo clock faces and timetables, while remaining highly readable for quick scanning.
 
 ### Color Palette
 All colors as complete hsl() functions:
 
 | Purpose | Color | CSS Variable |
 |---------|-------|--------------|
-| Page background | `hsl(40 33% 98%)` | `--background` |
-| Main text | `hsl(230 25% 18%)` | `--foreground` |
+| Page background | `hsl(215 25% 97%)` | `--background` |
+| Main text | `hsl(215 25% 15%)` | `--foreground` |
 | Card background | `hsl(0 0% 100%)` | `--card` |
-| Card text | `hsl(230 25% 18%)` | `--card-foreground` |
-| Borders | `hsl(40 20% 90%)` | `--border` |
-| Primary action | `hsl(243 75% 58%)` | `--primary` |
+| Card text | `hsl(215 25% 15%)` | `--card-foreground` |
+| Borders | `hsl(215 20% 88%)` | `--border` |
+| Primary action | `hsl(35 92% 50%)` | `--primary` |
 | Text on primary | `hsl(0 0% 100%)` | `--primary-foreground` |
-| Accent highlight | `hsl(243 75% 95%)` | `--accent` |
-| Muted background | `hsl(40 20% 96%)` | `--muted` |
-| Muted text | `hsl(230 10% 45%)` | `--muted-foreground` |
-| Success/positive | `hsl(152 60% 40%)` | (component use) |
-| Error/negative | `hsl(0 72% 51%)` | `--destructive` |
+| Accent highlight | `hsl(35 92% 95%)` | `--accent` |
+| Muted background | `hsl(215 20% 94%)` | `--muted` |
+| Muted text | `hsl(215 15% 45%)` | `--muted-foreground` |
+| Success/positive | `hsl(142 70% 40%)` | (component use) |
+| Error/negative | `hsl(0 84% 60%)` | `--destructive` |
 
 ### Why These Colors
-The warm cream background (`hsl(40 33% 98%)`) creates an inviting, non-clinical workspace feel. The deep indigo primary (`hsl(243 75% 58%)`) is distinctive without being playful - it conveys reliability and professionalism essential for business scheduling software. The color is rich enough to stand out but mature enough for daily work use.
+The cool slate-blue base (hsl 215) creates a professional, calm environment suitable for workplace tools. The warm amber primary (hsl 35) provides energetic contrast for actions and time indicators - amber naturally associates with clocks, timers, and alertness. The high contrast between dark text and light backgrounds ensures quick readability during busy moments.
 
 ### Background Treatment
-Solid warm off-white. The warmth comes from the subtle yellow undertone in the HSL (hue 40). Cards are pure white to create subtle lift. No gradients - the warmth and card separation provide enough visual interest.
+The page uses a subtle cool-tinted off-white (`hsl(215 25% 97%)`) rather than pure white. This reduces eye strain during extended use and creates a gentle "paper" feel that makes the white cards pop slightly.
 
 ---
 
 ## 4. Mobile Layout (Phone)
 
+Design mobile as a COMPLETELY SEPARATE experience, not squeezed desktop.
+
 ### Layout Approach
-Mobile is designed for the "quick morning check" use case - manager glances at phone to see who's working. The hero takes the full first viewport with massive numbers. Secondary info requires scrolling. Asymmetry exists in how the hero dominates vs. compressed supporting info.
+- Hero (today's shifts) takes the entire first viewport
+- Strong vertical timeline feel with large time indicators
+- Everything scrolls vertically in logical order
+- Fixed bottom action button for quick shift creation
 
 ### What Users See (Top to Bottom)
 
 **Header:**
-- App title "Schichtplaner" (left, 20px semibold)
-- Company filter dropdown if multiple companies (right, compact)
+- App title "Schichtplaner" (20px, weight 600) left-aligned
+- Today's date right-aligned in muted text (14px)
+- Total height: 56px with padding
 
 **Hero Section (The FIRST thing users see):**
-- Large card taking ~70% of viewport height
-- "Heute" label (14px muted)
-- Massive shift count "5 Schichten" (48px extra-bold indigo)
-- Horizontal row of employee initial badges (36px circles, stacked with -8px overlap)
-- Time range summary below: "06:00 - 22:00" (14px muted)
-- Subtle indigo left border accent (4px)
-- **Why this is the hero:** Answers "who's working today?" instantly without reading
+- Section title: "Heute" with badge showing count (e.g., "3 Schichten")
+- Takes approximately 70% of viewport height
+- Shows today's shifts as a scrollable vertical list
+- Each shift card displays:
+  - Left edge: Time range badge (e.g., "06:00 - 14:00") in monospace style, 16px bold
+  - Right of time: Employee name (16px medium) and shift type below (14px, muted)
+  - Active shift (current time) has amber left border and subtle amber background tint
+  - Cards have 12px vertical gap between them
+- **Why this is the hero:** Users open the app to answer "Who is working now?" - this answers it instantly
 
-**Section 2: Quick Stats Row**
-- Horizontal scrollable row of compact stat badges (not cards)
-- "Diese Woche: 24 Schichten" | "8 Mitarbeiter" | "3 Schichtarten"
-- Each stat is inline text with small icon, not a separate card
-- Creates density contrast with spacious hero
+**Section 2: Quick Stats**
+- Horizontal row of 3 compact stat boxes
+- "Diese Woche" (shifts this week) | "Mitarbeiter" (total employees) | "Schichtarten" (shift types)
+- Each stat: number large (24px bold), label small below (12px muted)
+- Full-width row, stats evenly distributed
+- Background: muted color, no card shadow
 
-**Section 3: Nächste Schichten (Upcoming Shifts)**
-- Simple list view (not cards)
-- Each item: Employee name, shift type badge, time
-- Grouped by day with sticky date headers
-- Shows next 7 days
-- Tap to see details (bottom sheet)
+**Section 3: Kommende Schichten**
+- Title: "Nächste 7 Tage"
+- Grouped by date (date header, then shifts for that date)
+- More compact than hero cards - single line per shift
+- Format: "Mo 15.01 | 06:00-14:00 | M. Müller | Frühschicht"
+- Maximum 10 items shown, scrollable
 
 **Bottom Navigation / Action:**
-- Fixed bottom bar with prominent "Neue Schicht" button (full-width, 56px height)
-- Indigo background, white text, rounded corners
-- Icon (plus) + text
+- Fixed bottom button bar (safe area aware)
+- Primary action button: "Schicht eintragen" (full width, 48px tall)
+- Amber background, white text, rounded (12px radius)
 
-### What is HIDDEN on Mobile
-- Weekly calendar grid (too small to be useful)
-- Detailed shift times table
-- Company details
-- Historical data
+### Mobile-Specific Adaptations
+- Today's shifts show full detail, upcoming shifts are compressed to single lines
+- No charts on mobile - just the essential shift information
+- Tap any shift to see full details in a bottom sheet
 
 ### Touch Targets
-- All interactive elements minimum 44px height
-- Employee badges 36px with 8px padding
-- List items full-width tap target, 56px minimum height
+- All interactive elements minimum 44px tap target
+- Shift cards have 16px padding for comfortable tapping
+- Bottom action button has 48px height plus safe area
 
 ### Interactive Elements
-- Tap on employee badge → shows their shifts for today
-- Tap on shift list item → bottom sheet with full shift details
+- Tap shift card → opens detail bottom sheet with full info and edit options
+- Pull down on hero section → refresh data
 
 ---
 
 ## 5. Desktop Layout
 
 ### Overall Structure
-60/40 left-heavy asymmetric split. The eye flows: hero stats (top-left dominant) → weekly calendar (left below) → upcoming list (right column for reference). The left column owns the narrative, the right provides supporting detail.
+- Maximum width: 1200px, centered
+- Two-column layout: 65% / 35% split
+- Left column: Today's shifts (hero) + upcoming week
+- Right column: Stats + quick filters + recent activity
+- Eye flow: Top-left (hero) → Right column (stats) → Down left (upcoming)
 
-### Column Layout
-- **Left column (60%):** Hero stats card + Weekly calendar view
-- **Right column (40%):** Upcoming shifts list + Quick add form
+### Section Layout
 
-The left is for understanding the big picture. The right is for action and detail.
+**Top Area:**
+- Full-width header bar with title left, date center, action button right
+- Action button "Neue Schicht" in header (amber, 40px tall)
 
-### Layout Diagram (ASCII)
-```
-┌────────────────────────────────────────┐  ┌─────────────────────────────┐
-│         HEADER: Schichtplaner          │  │    [+ Neue Schicht]         │
-└────────────────────────────────────────┘  └─────────────────────────────┘
+**Left Column (65%):**
+- **Hero Card: "Schichten Heute"**
+  - Large card with subtle shadow (0 4px 6px rgba(0,0,0,0.05))
+  - Shows all today's shifts in timeline format
+  - Current shift highlighted with amber accent
+  - Each row: Time (bold, monospace) | Employee name | Shift type | Company
+  - Generous row spacing (16px)
 
-┌────────────────────────────────────────┐  ┌─────────────────────────────┐
-│                                        │  │                             │
-│   HERO: Heute                          │  │   NÄCHSTE SCHICHTEN         │
-│   ┌─────────┐                          │  │                             │
-│   │ 5       │  Schichten heute         │  │   ─────────────────────     │
-│   │ ●●●●●   │  06:00 - 22:00           │  │   Mo 13.01.                 │
-│   └─────────┘                          │  │   · Max M. - Früh 06-14     │
-│                                        │  │   · Anna S. - Spät 14-22   │
-│   Quick stats: 24 diese Woche │ 8 MA   │  │   ─────────────────────     │
-│                                        │  │   Di 14.01.                 │
-└────────────────────────────────────────┘  │   · Lisa K. - Früh 06-14    │
-                                            │   ...                        │
-┌────────────────────────────────────────┐  │                             │
-│                                        │  │                             │
-│   WOCHENÜBERSICHT                      │  │                             │
-│   ┌────┬────┬────┬────┬────┬────┬────┐ │  │                             │
-│   │ Mo │ Di │ Mi │ Do │ Fr │ Sa │ So │ │  │                             │
-│   │ 5  │ 4  │ 6  │ 5  │ 4  │ 2  │ 1  │ │  │                             │
-│   └────┴────┴────┴────┴────┴────┴────┘ │  │                             │
-│                                        │  │                             │
-└────────────────────────────────────────┘  └─────────────────────────────┘
-```
+- **Below Hero: "Nächste 7 Tage"**
+  - Compact table-style view
+  - Columns: Datum | Zeit | Mitarbeiter | Schichtart | Unternehmen
+  - Alternating row backgrounds for readability
+  - Sortable by clicking column headers
+
+**Right Column (35%):**
+- **Stats Grid** (2x2 cards)
+  - Schichten heute | Schichten diese Woche
+  - Aktive Mitarbeiter | Schichtarten
+  - Each card: 100px tall, number prominent (32px), label below (14px muted)
+
+- **Filter/Quick View**
+  - Dropdown to filter by company
+  - Dropdown to filter by shift type
+
+- **Mini Calendar**
+  - Current week view showing which days have shifts (dots)
+  - Click day to filter the main view
 
 ### What Appears on Hover
-- Week day columns: highlight with accent background, show employee names tooltip
-- Shift list items: subtle lift shadow, show "Bearbeiten" action
-- Employee badges: show full name tooltip
+- Shift rows: subtle background highlight + "Details anzeigen" text appears right-aligned
+- Stat cards: subtle scale transform (1.02) and shadow increase
+- Action button: slight brightness increase
 
 ### Clickable/Interactive Areas
-- Week day columns → click to filter/focus that day
-- Shift list items → click to open edit dialog
-- Employee badges → click to see employee's schedule
+- Each shift row → opens side panel with full shift details
+- Stat cards → click to see breakdown (e.g., click "Mitarbeiter" to see employee list)
+- Calendar days → filter shifts to that day
 
 ---
 
@@ -183,91 +193,104 @@ The left is for understanding the big picture. The right is for action and detai
 ### Hero KPI
 The MOST important metric that users see first.
 
-- **Title:** Heute (Today)
-- **Data source:** Schichteinteilung (filtered by today's date)
-- **Calculation:** Count of shifts where zuweisung_datum = today
-- **Display:** Large number (48px bold) + employee avatar row + time span
-- **Context shown:** Time range of shifts (earliest start to latest end), employee initials
-- **Why this is the hero:** Managers' #1 question is "who's working today?" - this answers it instantly
+- **Title:** Schichten Heute
+- **Data source:** schichteinteilung (filtered by today's date)
+- **Calculation:** Filter records where `zuweisung_datum` = today, count and list
+- **Display:** List of shift cards, not just a number - users need to see WHO is working
+- **Context shown:** Current time indicator, active shift highlighted
+- **Why this is the hero:** The #1 question users have is "Who is working today?" - this answers it instantly with names and times
 
 ### Secondary KPIs
 
 **Schichten diese Woche**
-- Source: Schichteinteilung (current week)
-- Calculation: Count of shifts in current Mon-Sun
+- Source: schichteinteilung
+- Calculation: Count where `zuweisung_datum` between today and +7 days
 - Format: number
-- Display: Inline badge with icon
+- Display: Stat card, medium size
 
 **Aktive Mitarbeiter**
-- Source: Mitarbeiterverwaltung
-- Calculation: Count of unique employees with shifts this week
+- Source: mitarbeiterverwaltung
+- Calculation: Count all records
 - Format: number
-- Display: Inline badge with icon
+- Display: Stat card, medium size
 
 **Schichtarten**
-- Source: Schichtartenverwaltung
-- Calculation: Count of distinct shift types used this week
+- Source: schichtartenverwaltung
+- Calculation: Count all records
 - Format: number
-- Display: Inline badge with icon
+- Display: Stat card, small
 
-### Chart: Weekly Overview
-
-- **Type:** Bar chart - shows shift distribution across weekdays. Bar height immediately shows busy vs. light days.
-- **Title:** Wochenübersicht
-- **What question it answers:** Which days have most coverage? Are there gaps?
-- **Data source:** Schichteinteilung (current week)
-- **X-axis:** Weekday (Mo, Di, Mi, Do, Fr, Sa, So)
-- **Y-axis:** Number of shifts
-- **Mobile simplification:** Compact horizontal bar chart, or hidden entirely (replaced by quick stats)
+### Chart (if applicable)
+- **Type:** None for mobile, optional bar chart for desktop
+- On desktop right column: Simple bar showing shifts per day for current week
+- X-axis: Days (Mo, Di, Mi, Do, Fr, Sa, So)
+- Y-axis: Number of shifts
+- Subtle, not prominent - the list view is more useful than a chart
 
 ### Lists/Tables
 
-**Nächste Schichten (Upcoming Shifts)**
-- Purpose: See what's coming up, act on upcoming shifts
-- Source: Schichteinteilung (next 7 days)
-- Fields shown: Employee name (from applookup), shift type name, date, time (zuweisung_beginn - zuweisung_ende)
-- Mobile style: Simple list with date headers
-- Desktop style: Compact list with inline date badges
-- Sort: By zuweisung_datum ascending, then zuweisung_beginn
-- Limit: 15 items
+**Heute Schichten (Hero List)**
+- Purpose: Show exactly who is working today and when
+- Source: schichteinteilung filtered by today
+- Fields shown: zuweisung_beginn, zuweisung_ende, zuweisung_mitarbeiter (resolved), zuweisung_schichtart (resolved)
+- Mobile style: Tall cards with prominent time badge
+- Desktop style: Table rows with all fields visible
+- Sort: By zuweisung_beginn ascending (earliest first)
+- Limit: All (typically < 20 per day)
+
+**Kommende Schichten**
+- Purpose: See upcoming week at a glance
+- Source: schichteinteilung filtered by next 7 days
+- Fields shown: zuweisung_datum, zuweisung_beginn, zuweisung_ende, zuweisung_mitarbeiter (resolved), zuweisung_schichtart (resolved)
+- Mobile style: Compact single-line items
+- Desktop style: Full table with sortable columns
+- Sort: By zuweisung_datum, then zuweisung_beginn
+- Limit: 20 items
 
 ### Primary Action Button (REQUIRED!)
 
-- **Label:** Neue Schicht
+- **Label:** "Schicht eintragen"
 - **Action:** add_record
-- **Target app:** Schichteinteilung
-- **What data:** Form fields: zuweisung_datum (date picker), zuweisung_mitarbeiter (select from Mitarbeiterverwaltung), zuweisung_schichtart (select from Schichtartenverwaltung), zuweisung_beginn, zuweisung_ende, zuweisung_unternehmen (if multiple), zuweisung_notiz (optional)
-- **Mobile position:** bottom_fixed (sticky footer button)
-- **Desktop position:** header (top right prominent button)
-- **Why this action:** Creating shifts is the core workflow. Managers add shifts daily as schedules change. One tap access is essential.
+- **Target app:** schichteinteilung
+- **What data:** Form with fields:
+  - zuweisung_datum (date picker, default today)
+  - zuweisung_beginn (time input)
+  - zuweisung_ende (time input)
+  - zuweisung_mitarbeiter (select from mitarbeiterverwaltung)
+  - zuweisung_schichtart (select from schichtartenverwaltung)
+  - zuweisung_unternehmen (select from unternehmensverwaltung)
+  - zuweisung_notiz (optional textarea)
+- **Mobile position:** bottom_fixed
+- **Desktop position:** header (right side)
+- **Why this action:** Creating shift assignments is the core daily task - managers constantly add and adjust shifts throughout the day
 
 ---
 
 ## 7. Visual Details
 
 ### Border Radius
-Rounded (8px) - `--radius: 0.5rem`
-- Cards: 12px for larger cards, 8px for smaller elements
+- Cards: 12px (rounded, friendly but professional)
 - Buttons: 8px
-- Badges/pills: 20px (full pill for small tags)
+- Badges/pills: 6px
+- Input fields: 8px
 
 ### Shadows
-Subtle - cards have light shadow for depth without heaviness
-- Cards: `0 1px 3px hsl(230 25% 18% / 0.06), 0 1px 2px hsl(230 25% 18% / 0.04)`
-- Hover: `0 4px 12px hsl(230 25% 18% / 0.1)`
+- Cards: `0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 6px rgba(0, 0, 0, 0.04)` (subtle elevation)
+- Hero card: `0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 20px rgba(0, 0, 0, 0.04)` (slightly more elevated)
+- Buttons: none (flat design)
+- Modals: `0 20px 40px rgba(0, 0, 0, 0.15)`
 
 ### Spacing
-Normal with generous hero spacing
-- Base unit: 16px
-- Card padding: 24px (desktop), 16px (mobile)
-- Hero internal spacing: 32px
-- Between sections: 24px
-- Compact list items: 12px vertical
+- Page padding: 16px mobile, 24px desktop
+- Card padding: 16px mobile, 20px desktop
+- Between cards: 16px
+- Between sections: 32px
+- Row spacing in lists: 12px
 
 ### Animations
-- **Page load:** Stagger fade-in for cards (100ms delay between)
-- **Hover effects:** Subtle lift (translateY -2px) + shadow increase on cards
-- **Tap feedback:** Scale down 98% on press
+- **Page load:** Stagger fade-in (hero first, then stats, then upcoming)
+- **Hover effects:** Scale 1.02 on cards, background color shift on rows
+- **Tap feedback:** Scale 0.98 momentarily, then return
 
 ---
 
@@ -277,30 +300,25 @@ The implementer MUST copy these values exactly into `src/index.css`:
 
 ```css
 :root {
-  --radius: 0.5rem;
-  --background: hsl(40 33% 98%);
-  --foreground: hsl(230 25% 18%);
+  --background: hsl(215 25% 97%);
+  --foreground: hsl(215 25% 15%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(230 25% 18%);
+  --card-foreground: hsl(215 25% 15%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(230 25% 18%);
-  --primary: hsl(243 75% 58%);
+  --popover-foreground: hsl(215 25% 15%);
+  --primary: hsl(35 92% 50%);
   --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(40 20% 96%);
-  --secondary-foreground: hsl(230 25% 18%);
-  --muted: hsl(40 20% 96%);
-  --muted-foreground: hsl(230 10% 45%);
-  --accent: hsl(243 75% 95%);
-  --accent-foreground: hsl(243 75% 45%);
-  --destructive: hsl(0 72% 51%);
-  --border: hsl(40 20% 90%);
-  --input: hsl(40 20% 90%);
-  --ring: hsl(243 75% 58%);
-  --chart-1: hsl(243 75% 58%);
-  --chart-2: hsl(152 60% 40%);
-  --chart-3: hsl(40 90% 50%);
-  --chart-4: hsl(280 60% 55%);
-  --chart-5: hsl(200 75% 50%);
+  --secondary: hsl(215 20% 94%);
+  --secondary-foreground: hsl(215 25% 15%);
+  --muted: hsl(215 20% 94%);
+  --muted-foreground: hsl(215 15% 45%);
+  --accent: hsl(35 92% 95%);
+  --accent-foreground: hsl(35 92% 25%);
+  --destructive: hsl(0 84% 60%);
+  --border: hsl(215 20% 88%);
+  --input: hsl(215 20% 88%);
+  --ring: hsl(35 92% 50%);
+  --radius: 0.75rem;
 }
 ```
 
@@ -309,14 +327,13 @@ The implementer MUST copy these values exactly into `src/index.css`:
 ## 9. Implementation Checklist
 
 The implementer should verify:
-- [ ] Font loaded from URL above (Plus Jakarta Sans)
+- [ ] Font loaded from URL above (Space Grotesk)
 - [ ] All CSS variables copied exactly
-- [ ] Mobile layout matches Section 4 (hero dominant, fixed bottom button)
-- [ ] Desktop layout matches Section 5 (60/40 asymmetric split)
-- [ ] Hero element is prominent as described (48px bold count, employee avatars)
-- [ ] Colors create the mood described in Section 2 (warm + indigo professional)
-- [ ] Primary action "Neue Schicht" button is prominently placed
-- [ ] Weekly bar chart shows shift distribution
-- [ ] Upcoming shifts list shows next 7 days grouped by date
-- [ ] Employee names resolved from applookup references
-- [ ] Shift type names resolved from applookup references
+- [ ] Mobile layout matches Section 4 (hero shifts dominate, fixed bottom action)
+- [ ] Desktop layout matches Section 5 (65/35 split, timeline on left)
+- [ ] Hero element is prominent as described (today's shifts with time badges)
+- [ ] Colors create the mood described in Section 2 (professional slate-blue with amber accents)
+- [ ] Current shift highlighted with amber indicator
+- [ ] Primary action button present and functional (opens form to add shift)
+- [ ] Shift times displayed in bold monospace style
+- [ ] Employee and shift type names resolved from lookup apps

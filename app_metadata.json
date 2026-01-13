@@ -139,15 +139,6 @@
           "fulltype": "date/date",
           "description": "A calendar date consisting of year, month and day. (Or `null`/`None`)\n\nThe field value will be a string in the format `<YYYY>-<MM>-<DD>` or `null`.\n\nFor example: `1642-12-25`."
         },
-        "zuweisung_schichtart": {
-          "identifier": "zuweisung_schichtart",
-          "label": "Schichtart ausw\u00e4hlen",
-          "type": "applookup",
-          "subtype": "select",
-          "fulltype": "applookup/select",
-          "description": "A reference to another LivingApp record from a target lookup app (or `null`).\n\nThe field value will be a valid record URL in the form `https://<hostname>/rest/apps/<app-id>/records/<record-id>` or `null`.",
-          "lookup_app": "https://my.living-apps.de/rest/apps/682651bf710e2817fd194864"
-        },
         "zuweisung_unternehmen": {
           "identifier": "zuweisung_unternehmen",
           "label": "Unternehmen ausw\u00e4hlen",
@@ -156,6 +147,15 @@
           "fulltype": "applookup/select",
           "description": "A reference to another LivingApp record from a target lookup app (or `null`).\n\nThe field value will be a valid record URL in the form `https://<hostname>/rest/apps/<app-id>/records/<record-id>` or `null`.",
           "lookup_app": "https://my.living-apps.de/rest/apps/68b04d9e0d0c4ed362914845"
+        },
+        "zuweisung_schichtart": {
+          "identifier": "zuweisung_schichtart",
+          "label": "Schichtart ausw\u00e4hlen",
+          "type": "applookup",
+          "subtype": "select",
+          "fulltype": "applookup/select",
+          "description": "A reference to another LivingApp record from a target lookup app (or `null`).\n\nThe field value will be a valid record URL in the form `https://<hostname>/rest/apps/<app-id>/records/<record-id>` or `null`.",
+          "lookup_app": "https://my.living-apps.de/rest/apps/682651bf710e2817fd194864"
         }
       }
     },
