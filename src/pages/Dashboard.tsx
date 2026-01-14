@@ -1,811 +1,993 @@
-import { useState, useEffect, useMemo } from 'react';
-import type { Schichteinteilung, Mitarbeiterverwaltung, Schichtartenverwaltung, Unternehmensverwaltung } from '@/types/app';
+import type React from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  Badge as BadgeIcon,
+  CalendarRange,
+  CheckCircle2,
+  Clock3,
+  Factory,
+  ListChecks,
+  Mail,
+  Phone,
+  Plus,
+  Sparkles,
+  Target,
+  Users,
+} from 'lucide-react';
+import type {
+  CreateSchichteinteilung,
+  Mitarbeiterverwaltung,
+  Schichtartenverwaltung,
+  Schichteinteilung,
+  Unternehmensverwaltung,
+} from '@/types/app';
 import { APP_IDS } from '@/types/app';
-import { LivingAppsService, extractRecordId, createRecordUrl } from '@/services/livingAppsService';
-import { format, parseISO, isToday, isBefore, addDays, startOfDay } from 'date-fns';
-import { de } from 'date-fns/locale';
+import {
+  LivingAppsService,
+  createRecordUrl,
+  extractRecordId,
+} from '@/services/livingAppsService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Plus, Calendar, Users, Clock, Building2, AlertCircle, RefreshCw } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
+import {
+  addDays,
+  eachDayOfInterval,
+  endOfWeek,
+  format,
+  isAfter,
+  isBefore,
+  isSameDay,
+  isWithinInterval,
+  parse,
+  parseISO,
+  startOfWeek,
+} from 'date-fns';
+import { de } from 'date-fns/locale';
 
-// Enriched shift type with resolved references
-interface EnrichedShift extends Schichteinteilung {
-  mitarbeiter?: Mitarbeiterverwaltung;
-  schichtart?: Schichtartenverwaltung;
-  unternehmen?: Unternehmensverwaltung;
+type EnrichedAssignment = Schichteinteilung & {
+  employee?: Mitarbeiterverwaltung;
+  company?: Unternehmensverwaltung;
+  shiftType?: Schichtartenverwaltung;
+};
+
+const chartColors = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+];
+
+const DEFAULT_GOAL = 12;
+
+function combineDateTime(dateStr?: string, timeStr?: string): Date | null {
+  if (!dateStr) return null;
+  const safeTime = timeStr && /^\d{1,2}:\d{2}$/.test(timeStr) ? timeStr : '12:00';
+  const value = `${dateStr}T${safeTime}`;
+  const parsed = parseISO(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-// Check if shift is currently active
-function isShiftActive(shift: EnrichedShift): boolean {
-  if (!shift.fields.zuweisung_datum || !shift.fields.zuweisung_beginn || !shift.fields.zuweisung_ende) {
-    return false;
+function formatDateLabel(dateStr?: string) {
+  if (!dateStr) return 'Ohne Datum';
+  try {
+    return format(parseISO(dateStr), 'dd.MM.yyyy', { locale: de });
+  } catch (e) {
+    return dateStr;
   }
-
-  const today = new Date();
-  const shiftDate = shift.fields.zuweisung_datum;
-  const todayStr = format(today, 'yyyy-MM-dd');
-
-  if (shiftDate !== todayStr) return false;
-
-  const now = format(today, 'HH:mm');
-  const start = shift.fields.zuweisung_beginn;
-  const end = shift.fields.zuweisung_ende;
-
-  return now >= start && now <= end;
 }
 
-// Format employee name
-function formatEmployeeName(employee?: Mitarbeiterverwaltung): string {
-  if (!employee) return 'Unbekannt';
-  const firstName = employee.fields.mitarbeiter_vorname || '';
-  const lastName = employee.fields.mitarbeiter_nachname || '';
-  return `${firstName} ${lastName}`.trim() || 'Unbekannt';
+function formatTimeRange(start?: string, end?: string) {
+  if (!start && !end) return 'Zeit offen';
+  if (!start) return `bis ${end}`;
+  if (!end) return `${start} - ?`;
+  return `${start} - ${end}`;
 }
 
-// Loading skeleton for shifts
-function ShiftsSkeleton() {
-  return (
-    <div className="space-y-3">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-card">
-          <Skeleton className="h-12 w-24" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-4 w-24" />
-          </div>
+function getEmployeeName(employee?: Mitarbeiterverwaltung) {
+  if (!employee) return 'Unbesetzt';
+  const { mitarbeiter_vorname, mitarbeiter_nachname } = employee.fields;
+  return [mitarbeiter_vorname, mitarbeiter_nachname].filter(Boolean).join(' ') || 'Unbenannter Mitarbeiter';
+}
+
+const EmptyState = ({ onRetry }: { onRetry: () => void }) => (
+  <Card className="border-dashed shadow-none">
+    <CardContent className="flex flex-col items-start gap-3 py-6">
+      <div className="flex items-center gap-3">
+        <Sparkles className="h-5 w-5 text-accent" />
+        <div>
+          <p className="text-lg font-semibold">Noch keine Daten</p>
+          <p className="text-sm text-muted-foreground">
+            Lege deine erste Schicht an, um das Dashboard zu füllen.
+          </p>
         </div>
-      ))}
-    </div>
-  );
-}
-
-// Stats skeleton
-function StatsSkeleton() {
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="p-4 rounded-xl bg-muted">
-          <Skeleton className="h-8 w-12 mb-2" />
-          <Skeleton className="h-3 w-16" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Empty state component
-function EmptyState({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
-      <p className="text-muted-foreground mb-4 max-w-sm">{description}</p>
-      {action}
-    </div>
-  );
-}
-
-// Shift card component
-function ShiftCard({
-  shift,
-  isActive,
-  onClick
-}: {
-  shift: EnrichedShift;
-  isActive: boolean;
-  onClick: () => void;
-}) {
-  const timeRange = `${shift.fields.zuweisung_beginn || '00:00'} - ${shift.fields.zuweisung_ende || '00:00'}`;
-  const employeeName = formatEmployeeName(shift.mitarbeiter);
-  const shiftTypeName = shift.schichtart?.fields.schichtart_name || 'Schicht';
-
-  return (
-    <div
-      className={`
-        flex items-center gap-4 p-4 rounded-xl bg-card cursor-pointer
-        transition-all duration-200 hover:shadow-md
-        ${isActive ? 'border-l-4 border-l-primary bg-accent/30' : 'border border-border'}
-      `}
-      onClick={onClick}
-    >
-      <div className={`
-        font-mono text-base font-bold px-3 py-2 rounded-lg
-        ${isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}
-      `}>
-        {timeRange}
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-base truncate">{employeeName}</span>
-          {isActive && (
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-xs text-primary font-medium">Aktiv</span>
-            </span>
+      <Button onClick={onRetry} variant="outline">
+        Neu laden
+      </Button>
+    </CardContent>
+  </Card>
+);
+
+function KPIChip({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  highlight,
+}: {
+  title: string;
+  value: string;
+  subtitle?: string;
+  icon: React.ElementType;
+  highlight?: boolean;
+}) {
+  return (
+    <Card
+      className={cn(
+        'min-w-[180px] border-none shadow-[0_8px_16px_rgba(34,41,47,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(34,41,47,0.08)]',
+        highlight && 'bg-primary text-primary-foreground',
+      )}
+    >
+      <CardContent className="flex items-center gap-3 py-4">
+        <div
+          className={cn(
+            'flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-foreground',
+            highlight && 'bg-primary-foreground/20 text-primary-foreground',
+          )}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="space-y-0.5">
+          <p className={cn('text-sm text-muted-foreground', highlight && 'text-primary-foreground/80')}>
+            {title}
+          </p>
+          <p className="text-xl font-semibold leading-tight">{value}</p>
+          {subtitle && (
+            <p className={cn('text-xs text-muted-foreground', highlight && 'text-primary-foreground/80')}>
+              {subtitle}
+            </p>
           )}
         </div>
-        <div className="text-sm text-muted-foreground truncate">{shiftTypeName}</div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
-// Compact shift row for upcoming section
-function CompactShiftRow({ shift, onClick }: { shift: EnrichedShift; onClick: () => void }) {
-  const date = shift.fields.zuweisung_datum
-    ? format(parseISO(shift.fields.zuweisung_datum), 'EEE dd.MM', { locale: de })
-    : '';
-  const timeRange = `${shift.fields.zuweisung_beginn || '00:00'}-${shift.fields.zuweisung_ende || '00:00'}`;
-  const employeeName = formatEmployeeName(shift.mitarbeiter);
-  const shiftTypeName = shift.schichtart?.fields.schichtart_name || '';
-
-  return (
-    <div
-      className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted cursor-pointer transition-colors text-sm"
-      onClick={onClick}
-    >
-      <span className="text-muted-foreground w-16 shrink-0">{date}</span>
-      <span className="font-mono font-medium w-24 shrink-0">{timeRange}</span>
-      <span className="truncate flex-1">{employeeName}</span>
-      <span className="text-muted-foreground truncate max-w-[100px]">{shiftTypeName}</span>
-    </div>
-  );
-}
-
-// Shift detail sheet
-function ShiftDetailSheet({
-  shift,
-  open,
-  onOpenChange
-}: {
-  shift: EnrichedShift | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  if (!shift) return null;
-
-  const employeeName = formatEmployeeName(shift.mitarbeiter);
-  const shiftTypeName = shift.schichtart?.fields.schichtart_name || 'Schicht';
-  const companyName = shift.unternehmen?.fields.unternehmen_name || '-';
-  const date = shift.fields.zuweisung_datum
-    ? format(parseISO(shift.fields.zuweisung_datum), 'EEEE, dd. MMMM yyyy', { locale: de })
-    : '-';
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle>Schichtdetails</SheetTitle>
-        </SheetHeader>
-        <div className="mt-6 space-y-6">
-          <div>
-            <div className="text-sm text-muted-foreground mb-1">Mitarbeiter</div>
-            <div className="text-lg font-semibold">{employeeName}</div>
-            {shift.mitarbeiter?.fields.mitarbeiter_email && (
-              <div className="text-sm text-muted-foreground">{shift.mitarbeiter.fields.mitarbeiter_email}</div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Datum</div>
-              <div className="font-medium">{date}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Uhrzeit</div>
-              <div className="font-medium font-mono">
-                {shift.fields.zuweisung_beginn || '00:00'} - {shift.fields.zuweisung_ende || '00:00'}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Schichtart</div>
-              <div className="font-medium">{shiftTypeName}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Unternehmen</div>
-              <div className="font-medium">{companyName}</div>
-            </div>
-          </div>
-
-          {shift.fields.zuweisung_notiz && (
-            <div>
-              <div className="text-sm text-muted-foreground mb-1">Notiz</div>
-              <div className="text-sm bg-muted p-3 rounded-lg">{shift.fields.zuweisung_notiz}</div>
-            </div>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-// Add shift form
-function AddShiftForm({
+function AddShiftDialog({
   employees,
-  shiftTypes,
   companies,
+  shiftTypes,
   onSuccess,
-  onCancel
+  trigger,
 }: {
   employees: Mitarbeiterverwaltung[];
-  shiftTypes: Schichtartenverwaltung[];
   companies: Unternehmensverwaltung[];
+  shiftTypes: Schichtartenverwaltung[];
   onSuccess: () => void;
-  onCancel: () => void;
+  trigger: React.ReactNode;
 }) {
-  const [formData, setFormData] = useState({
-    datum: format(new Date(), 'yyyy-MM-dd'),
-    beginn: '08:00',
-    ende: '16:00',
-    mitarbeiter: '',
-    schichtart: '',
-    unternehmen: '',
-    notiz: ''
-  });
+  const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState<{
+    employeeId?: string;
+    companyId?: string;
+    shiftTypeId?: string;
+    date?: string;
+    start?: string;
+    end?: string;
+    note?: string;
+  }>({});
 
-  async function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    if (!open) return;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    setForm((prev) => ({
+      ...prev,
+      date: prev.date ?? today,
+    }));
+  }, [open]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
+    if (!form.employeeId || !form.companyId || !form.shiftTypeId || !form.date || !form.start || !form.end) {
+      setError('Bitte fülle alle Pflichtfelder aus.');
+      return;
+    }
+    const payload: CreateSchichteinteilung = {
+      zuweisung_mitarbeiter: createRecordUrl(APP_IDS.MITARBEITERVERWALTUNG, form.employeeId),
+      zuweisung_unternehmen: createRecordUrl(APP_IDS.UNTERNEHMENSVERWALTUNG, form.companyId),
+      zuweisung_schichtart: createRecordUrl(APP_IDS.SCHICHTARTENVERWALTUNG, form.shiftTypeId),
+      zuweisung_datum: form.date,
+      zuweisung_beginn: form.start,
+      zuweisung_ende: form.end,
+      ...(form.note ? { zuweisung_notiz: form.note } : {}),
+    };
 
     try {
-      await LivingAppsService.createSchichteinteilungEntry({
-        zuweisung_datum: formData.datum,
-        zuweisung_beginn: formData.beginn,
-        zuweisung_ende: formData.ende,
-        zuweisung_mitarbeiter: formData.mitarbeiter
-          ? createRecordUrl(APP_IDS.MITARBEITERVERWALTUNG, formData.mitarbeiter)
-          : undefined,
-        zuweisung_schichtart: formData.schichtart
-          ? createRecordUrl(APP_IDS.SCHICHTARTENVERWALTUNG, formData.schichtart)
-          : undefined,
-        zuweisung_unternehmen: formData.unternehmen
-          ? createRecordUrl(APP_IDS.UNTERNEHMENSVERWALTUNG, formData.unternehmen)
-          : undefined,
-        zuweisung_notiz: formData.notiz || undefined
-      });
+      setSubmitting(true);
+      await LivingAppsService.createSchichteinteilungEntry(payload);
+      setOpen(false);
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Speichern');
+      setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen');
     } finally {
       setSubmitting(false);
     }
-  }
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="datum">Datum</Label>
-          <Input
-            id="datum"
-            type="date"
-            value={formData.datum}
-            onChange={(e) => setFormData(prev => ({ ...prev, datum: e.target.value }))}
-            required
-          />
-        </div>
-        <div className="space-y-2 col-span-2 grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="beginn">Beginn</Label>
-            <Input
-              id="beginn"
-              type="time"
-              value={formData.beginn}
-              onChange={(e) => setFormData(prev => ({ ...prev, beginn: e.target.value }))}
-              required
-            />
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Schicht zuweisen</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Erstelle eine neue Schichteinteilung mit Mitarbeiter, Unternehmen und Schichtart.
+          </p>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Mitarbeiter *</Label>
+              <Select
+                value={form.employeeId ?? 'none'}
+                onValueChange={(value) =>
+                  setForm((prev) => ({ ...prev, employeeId: value === 'none' ? undefined : value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Auswählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Auswählen</SelectItem>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.record_id} value={emp.record_id}>
+                      {getEmployeeName(emp)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Unternehmen *</Label>
+              <Select
+                value={form.companyId ?? 'none'}
+                onValueChange={(value) =>
+                  setForm((prev) => ({ ...prev, companyId: value === 'none' ? undefined : value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Auswählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Auswählen</SelectItem>
+                  {companies.map((comp) => (
+                    <SelectItem key={comp.record_id} value={comp.record_id}>
+                      {comp.fields.unternehmen_name ?? 'Ohne Namen'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Schichtart *</Label>
+              <Select
+                value={form.shiftTypeId ?? 'none'}
+                onValueChange={(value) =>
+                  setForm((prev) => {
+                    const selected = shiftTypes.find((s) => s.record_id === value);
+                    return {
+                      ...prev,
+                      shiftTypeId: value === 'none' ? undefined : value,
+                      start: selected?.fields.schichtart_beginn ?? prev.start,
+                      end: selected?.fields.schichtart_ende ?? prev.end,
+                    };
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Auswählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Auswählen</SelectItem>
+                  {shiftTypes.map((type) => (
+                    <SelectItem key={type.record_id} value={type.record_id}>
+                      {type.fields.schichtart_name ?? 'Ohne Titel'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Datum *</Label>
+              <Input
+                type="date"
+                value={form.date ?? ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Beginn *</Label>
+              <Input
+                type="time"
+                value={form.start ?? ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, start: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Ende *</Label>
+              <Input
+                type="time"
+                value={form.end ?? ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, end: e.target.value }))}
+              />
+            </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ende">Ende</Label>
+            <Label>Notiz</Label>
+            <Textarea
+              rows={3}
+              placeholder="Optionale Hinweise zur Schicht"
+              value={form.note ?? ''}
+              onChange={(e) => setForm((prev) => ({ ...prev, note: e.target.value }))}
+            />
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertTitle>Fehler</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <div className="flex items-center justify-end gap-3">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>
+              Abbrechen
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? 'Speichern...' : 'Schicht speichern'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function HeroCard({
+  assigned,
+  goal,
+  dateLabel,
+  companyLabel,
+  onAdjustGoal,
+}: {
+  assigned: number;
+  goal: number;
+  dateLabel: string;
+  companyLabel: string;
+  onAdjustGoal: (value: number) => void;
+}) {
+  const coverage = goal > 0 ? Math.min((assigned / goal) * 100, 150) : 0;
+  const delta = goal - assigned;
+
+  return (
+    <Card className="relative overflow-hidden border-none shadow-[0_12px_30px_rgba(34,41,47,0.06)]">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-accent to-primary/70" />
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
+              Heute
+            </div>
+            <Badge variant="outline" className="gap-1 text-muted-foreground">
+              <CalendarRange className="h-3.5 w-3.5" />
+              {dateLabel}
+            </Badge>
+            <Badge variant="outline" className="gap-1 text-muted-foreground">
+              <Factory className="h-3.5 w-3.5" />
+              {companyLabel}
+            </Badge>
+          </div>
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Heutige Besetzung</span>
+        </div>
+        <div className="mt-6 space-y-2">
+          <div className="flex items-end gap-3">
+            <p className="text-4xl font-semibold text-foreground">
+              {assigned}/{goal}
+            </p>
+            <p className="pb-1 text-sm text-muted-foreground">besetzt</p>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CheckCircle2
+              className={cn(
+                'h-4 w-4',
+                coverage >= 100 ? 'text-[var(--chart-2)]' : 'text-accent',
+              )}
+            />
+            {coverage >= 100 ? 'Ziel erreicht' : `${delta} Plätze frei`}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-0">
+        <Progress value={goal === 0 ? 0 : Math.min((assigned / goal) * 100, 100)} className="h-3" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <Target className="h-4 w-4 text-primary" />
+            <span className="font-semibold text-foreground">{goal}</span>
+            <span className="text-muted-foreground">geplante Plätze</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Label className="text-sm text-muted-foreground">Ziel anpassen</Label>
             <Input
-              id="ende"
-              type="time"
-              value={formData.ende}
-              onChange={(e) => setFormData(prev => ({ ...prev, ende: e.target.value }))}
-              required
+              type="number"
+              min={Math.max(assigned, 1)}
+              value={goal}
+              onChange={(e) => onAdjustGoal(Number(e.target.value))}
+              className="h-10 w-24 border-border bg-muted/60"
             />
           </div>
         </div>
-      </div>
+      </CardContent>
+    </Card>
+  );
+}
 
-      <div className="space-y-2">
-        <Label htmlFor="mitarbeiter">Mitarbeiter</Label>
-        <Select
-          value={formData.mitarbeiter}
-          onValueChange={(v) => setFormData(prev => ({ ...prev, mitarbeiter: v }))}
-        >
-          <SelectTrigger id="mitarbeiter">
-            <SelectValue placeholder="Mitarbeiter auswählen..." />
-          </SelectTrigger>
-          <SelectContent>
-            {employees.map((emp) => (
-              <SelectItem key={emp.record_id} value={emp.record_id}>
-                {formatEmployeeName(emp)}
-              </SelectItem>
+function NextShifts({
+  assignments,
+  loading,
+}: {
+  assignments: EnrichedAssignment[];
+  loading: boolean;
+}) {
+  return (
+    <Card className="h-full border-none shadow-[0_12px_30px_rgba(34,41,47,0.06)]">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Nächste Schichten</CardTitle>
+          <Badge className="gap-1 bg-secondary text-foreground">
+            <Clock3 className="h-3.5 w-3.5" />
+            bald
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">Aufsteigend nach Datum und Beginn.</p>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <Skeleton key={idx} className="h-16 w-full rounded-xl" />
             ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="schichtart">Schichtart</Label>
-        <Select
-          value={formData.schichtart}
-          onValueChange={(v) => setFormData(prev => ({ ...prev, schichtart: v }))}
-        >
-          <SelectTrigger id="schichtart">
-            <SelectValue placeholder="Schichtart auswählen..." />
-          </SelectTrigger>
-          <SelectContent>
-            {shiftTypes.map((type) => (
-              <SelectItem key={type.record_id} value={type.record_id}>
-                {type.fields.schichtart_name || 'Unbenannt'}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="unternehmen">Unternehmen</Label>
-        <Select
-          value={formData.unternehmen}
-          onValueChange={(v) => setFormData(prev => ({ ...prev, unternehmen: v }))}
-        >
-          <SelectTrigger id="unternehmen">
-            <SelectValue placeholder="Unternehmen auswählen..." />
-          </SelectTrigger>
-          <SelectContent>
-            {companies.map((company) => (
-              <SelectItem key={company.record_id} value={company.record_id}>
-                {company.fields.unternehmen_name || 'Unbenannt'}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="notiz">Notiz (optional)</Label>
-        <Textarea
-          id="notiz"
-          value={formData.notiz}
-          onChange={(e) => setFormData(prev => ({ ...prev, notiz: e.target.value }))}
-          placeholder="Zusätzliche Informationen..."
-          rows={3}
-        />
-      </div>
-
-      <div className="flex gap-3 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-          Abbrechen
-        </Button>
-        <Button type="submit" disabled={submitting} className="flex-1">
-          {submitting ? 'Speichern...' : 'Schicht eintragen'}
-        </Button>
-      </div>
-    </form>
+          </div>
+        ) : (
+          <ScrollArea className="max-h-[420px] pr-2">
+            <div className="space-y-3">
+              {assignments.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Keine anstehenden Schichten in diesem Zeitraum.
+                </p>
+              )}
+              {assignments.map((item) => (
+                <div
+                  key={item.record_id}
+                  className="group flex cursor-pointer items-start justify-between gap-3 rounded-xl border border-border/60 bg-card/80 px-4 py-3 transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-[0_10px_24px_rgba(34,41,47,0.08)]"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-semibold">{getEmployeeName(item.employee)}</span>
+                      <Badge variant="secondary" className="gap-1">
+                        <Factory className="h-3 w-3" />
+                        {item.company?.fields.unternehmen_name ?? 'Kein Unternehmen'}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <Badge className="bg-primary/15 text-primary">
+                        {item.shiftType?.fields.schichtart_name ?? 'Schichtart offen'}
+                      </Badge>
+                      <span>{formatDateLabel(item.fields.zuweisung_datum)}</span>
+                      <span>•</span>
+                      <span>{formatTimeRange(item.fields.zuweisung_beginn, item.fields.zuweisung_ende)}</span>
+                      {item.fields.zuweisung_notiz && (
+                        <Badge variant="outline" className="gap-1 text-xs">
+                          <BadgeIcon className="h-3 w-3" />
+                          Notiz
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground">
+                      <Mail className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground">
+                      <Phone className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
 export default function Dashboard() {
-  const [shifts, setShifts] = useState<Schichteinteilung[]>([]);
-  const [employees, setEmployees] = useState<Mitarbeiterverwaltung[]>([]);
-  const [shiftTypes, setShiftTypes] = useState<Schichtartenverwaltung[]>([]);
+  const [assignments, setAssignments] = useState<Schichteinteilung[]>([]);
   const [companies, setCompanies] = useState<Unternehmensverwaltung[]>([]);
+  const [shiftTypes, setShiftTypes] = useState<Schichtartenverwaltung[]>([]);
+  const [employees, setEmployees] = useState<Mitarbeiterverwaltung[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [selectedShift, setSelectedShift] = useState<EnrichedShift | null>(null);
-  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [goalOverride, setGoalOverride] = useState<number | null>(null);
+  const [rangeFilter, setRangeFilter] = useState<'week' | 'next' | 'all'>('week');
 
-  // Fetch all data
-  async function fetchData() {
+  const today = useMemo(() => new Date(), []);
+  const todayStr = format(today, 'yyyy-MM-dd');
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+
+  const fetchData = async () => {
+    setError(null);
     try {
       setLoading(true);
-      setError(null);
-      const [shiftsData, employeesData, shiftTypesData, companiesData] = await Promise.all([
+      const [assignmentData, companyData, shiftTypeData, employeeData] = await Promise.all([
         LivingAppsService.getSchichteinteilung(),
-        LivingAppsService.getMitarbeiterverwaltung(),
+        LivingAppsService.getUnternehmensverwaltung(),
         LivingAppsService.getSchichtartenverwaltung(),
-        LivingAppsService.getUnternehmensverwaltung()
+        LivingAppsService.getMitarbeiterverwaltung(),
       ]);
-      setShifts(shiftsData);
-      setEmployees(employeesData);
-      setShiftTypes(shiftTypesData);
-      setCompanies(companiesData);
+      setAssignments(assignmentData);
+      setCompanies(companyData);
+      setShiftTypes(shiftTypeData);
+      setEmployees(employeeData);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Fehler beim Laden der Daten'));
+      setError(err instanceof Error ? err : new Error('Unbekannter Fehler'));
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  // Create lookup maps
-  const employeeMap = useMemo(() => {
-    const map = new Map<string, Mitarbeiterverwaltung>();
-    employees.forEach(emp => map.set(emp.record_id, emp));
-    return map;
-  }, [employees]);
+  const coverageGoal = goalOverride ?? Math.max(shiftTypes.length || 0, DEFAULT_GOAL);
 
-  const shiftTypeMap = useMemo(() => {
-    const map = new Map<string, Schichtartenverwaltung>();
-    shiftTypes.forEach(type => map.set(type.record_id, type));
-    return map;
-  }, [shiftTypes]);
+  const assignmentMap = useMemo(() => {
+    const employeeMap = new Map<string, Mitarbeiterverwaltung>();
+    employees.forEach((emp) => employeeMap.set(emp.record_id, emp));
+    const companyMap = new Map<string, Unternehmensverwaltung>();
+    companies.forEach((c) => companyMap.set(c.record_id, c));
+    const shiftTypeMap = new Map<string, Schichtartenverwaltung>();
+    shiftTypes.forEach((s) => shiftTypeMap.set(s.record_id, s));
 
-  const companyMap = useMemo(() => {
-    const map = new Map<string, Unternehmensverwaltung>();
-    companies.forEach(company => map.set(company.record_id, company));
-    return map;
-  }, [companies]);
+    return { employeeMap, companyMap, shiftTypeMap };
+  }, [employees, companies, shiftTypes]);
 
-  // Enrich shifts with resolved references
-  const enrichedShifts = useMemo<EnrichedShift[]>(() => {
-    return shifts.map(shift => {
-      const mitarbeiterId = extractRecordId(shift.fields.zuweisung_mitarbeiter);
-      const schichtartId = extractRecordId(shift.fields.zuweisung_schichtart);
-      const unternehmenId = extractRecordId(shift.fields.zuweisung_unternehmen);
+  const assignmentsWithRefs: EnrichedAssignment[] = useMemo(
+    () =>
+      assignments.map((item) => {
+        const employeeId = extractRecordId(item.fields.zuweisung_mitarbeiter);
+        const companyId = extractRecordId(item.fields.zuweisung_unternehmen);
+        const shiftTypeId = extractRecordId(item.fields.zuweisung_schichtart);
+        return {
+          ...item,
+          employee: employeeId ? assignmentMap.employeeMap.get(employeeId) : undefined,
+          company: companyId ? assignmentMap.companyMap.get(companyId) : undefined,
+          shiftType: shiftTypeId ? assignmentMap.shiftTypeMap.get(shiftTypeId) : undefined,
+        };
+      }),
+    [assignments, assignmentMap],
+  );
 
-      return {
-        ...shift,
-        mitarbeiter: mitarbeiterId ? employeeMap.get(mitarbeiterId) : undefined,
-        schichtart: schichtartId ? shiftTypeMap.get(schichtartId) : undefined,
-        unternehmen: unternehmenId ? companyMap.get(unternehmenId) : undefined
-      };
+  const todaysAssignments = assignmentsWithRefs.filter((item) =>
+    item.fields.zuweisung_datum ? isSameDay(parseISO(item.fields.zuweisung_datum), today) : false,
+  );
+
+  const weeklyAssignments = assignmentsWithRefs.filter((item) => {
+    if (!item.fields.zuweisung_datum) return false;
+    const date = parseISO(item.fields.zuweisung_datum);
+    return isWithinInterval(date, { start: weekStart, end: weekEnd });
+  });
+
+  const weeklyShiftCounts = useMemo(() => {
+    const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
+    return days.map((day) => {
+      const label = format(day, 'EE', { locale: de });
+      const count = weeklyAssignments.filter((item) => {
+        if (!item.fields.zuweisung_datum) return false;
+        return isSameDay(parseISO(item.fields.zuweisung_datum), day);
+      }).length;
+      return { day: label, count };
     });
-  }, [shifts, employeeMap, shiftTypeMap, companyMap]);
+  }, [weekStart, weekEnd, weeklyAssignments]);
 
-  // Filter today's shifts
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const todaysShifts = useMemo(() => {
-    return enrichedShifts
-      .filter(s => s.fields.zuweisung_datum === todayStr)
+  const shiftTypeMix = useMemo(() => {
+    const counter = new Map<string, { name: string; value: number }>();
+    weeklyAssignments.forEach((item) => {
+      const id = extractRecordId(item.fields.zuweisung_schichtart);
+      if (!id) return;
+      const name = assignmentMap.shiftTypeMap.get(id)?.fields.schichtart_name ?? 'Ohne Schichtart';
+      const existing = counter.get(id);
+      counter.set(id, { name, value: (existing?.value ?? 0) + 1 });
+    });
+    return Array.from(counter.values());
+  }, [weeklyAssignments, assignmentMap.shiftTypeMap]);
+
+  const mostUsedShift = shiftTypeMix.reduce<{ name: string; value: number } | null>(
+    (acc, item) => {
+      if (!acc || item.value > acc.value) return item;
+      return acc;
+    },
+    null,
+  );
+
+  const employeesWithoutToday = useMemo(() => {
+    const assignedIds = new Set(
+      todaysAssignments
+        .map((item) => extractRecordId(item.fields.zuweisung_mitarbeiter))
+        .filter((id): id is string => Boolean(id)),
+    );
+    return employees.filter((emp) => !assignedIds.has(emp.record_id)).length;
+  }, [todaysAssignments, employees]);
+
+  const freeSlotsToday = Math.max(coverageGoal - todaysAssignments.length, 0);
+
+  const upcomingAssignments = useMemo(() => {
+    const now = today;
+    const filtered = assignmentsWithRefs.filter((item) => {
+      if (!item.fields.zuweisung_datum) return false;
+      const dateObj = combineDateTime(item.fields.zuweisung_datum, item.fields.zuweisung_beginn);
+      if (!dateObj) return false;
+      if (rangeFilter === 'week') {
+        return isWithinInterval(dateObj, { start: weekStart, end: weekEnd }) && isAfter(dateObj, addDays(now, -1));
+      }
+      if (rangeFilter === 'next') {
+        return isAfter(dateObj, addDays(now, -1)) && isBefore(dateObj, addDays(now, 7));
+      }
+      return true;
+    });
+    return filtered
       .sort((a, b) => {
-        const aTime = a.fields.zuweisung_beginn || '00:00';
-        const bTime = b.fields.zuweisung_beginn || '00:00';
-        return aTime.localeCompare(bTime);
-      });
-  }, [enrichedShifts, todayStr]);
-
-  // Filter upcoming shifts (next 7 days, excluding today)
-  const upcomingShifts = useMemo(() => {
-    const tomorrow = startOfDay(addDays(new Date(), 1));
-    const weekEnd = startOfDay(addDays(new Date(), 8));
-
-    return enrichedShifts
-      .filter(s => {
-        if (!s.fields.zuweisung_datum) return false;
-        const shiftDate = parseISO(s.fields.zuweisung_datum);
-        return shiftDate >= tomorrow && shiftDate < weekEnd;
+        const dateA = combineDateTime(a.fields.zuweisung_datum, a.fields.zuweisung_beginn)?.getTime() ?? 0;
+        const dateB = combineDateTime(b.fields.zuweisung_datum, b.fields.zuweisung_beginn)?.getTime() ?? 0;
+        return dateA - dateB;
       })
-      .sort((a, b) => {
-        const aDate = a.fields.zuweisung_datum || '';
-        const bDate = b.fields.zuweisung_datum || '';
-        if (aDate !== bDate) return aDate.localeCompare(bDate);
-        const aTime = a.fields.zuweisung_beginn || '00:00';
-        const bTime = b.fields.zuweisung_beginn || '00:00';
-        return aTime.localeCompare(bTime);
-      })
-      .slice(0, 20);
-  }, [enrichedShifts]);
+      .slice(0, 8);
+  }, [assignmentsWithRefs, rangeFilter, weekStart, weekEnd, today]);
 
-  // Calculate week's shifts count
-  const weekShiftsCount = useMemo(() => {
-    const weekEnd = startOfDay(addDays(new Date(), 7));
-    return enrichedShifts.filter(s => {
-      if (!s.fields.zuweisung_datum) return false;
-      const shiftDate = parseISO(s.fields.zuweisung_datum);
-      return shiftDate >= startOfDay(new Date()) && shiftDate < weekEnd;
-    }).length;
-  }, [enrichedShifts]);
+  const kpiCards = [
+    {
+      title: 'Schichten diese Woche',
+      value: weeklyAssignments.length.toString(),
+      subtitle: 'Montag - Sonntag',
+      icon: CalendarRange,
+    },
+    {
+      title: 'Freie Slots heute',
+      value: freeSlotsToday.toString(),
+      subtitle: 'auf Basis deines Ziels',
+      icon: ListChecks,
+      highlight: freeSlotsToday > 0,
+    },
+    {
+      title: 'Meistgenutzte Schichtart',
+      value: mostUsedShift ? mostUsedShift.name : 'Keine Daten',
+      subtitle: mostUsedShift ? `${mostUsedShift.value} Einsätze` : 'Woche noch leer',
+      icon: Sparkles,
+    },
+    {
+      title: 'Mitarbeiter ohne Schicht heute',
+      value: employeesWithoutToday.toString(),
+      subtitle: 'noch nicht eingeplant',
+      icon: Users,
+      highlight: employeesWithoutToday > 0,
+    },
+  ];
 
-  // Handle add success
-  function handleAddSuccess() {
-    setAddDialogOpen(false);
-    fetchData();
-  }
+  const heroDateLabel = format(today, 'EEE, dd. MMM', { locale: de });
+  const companyLabel = companies.length > 0 ? companies[0].fields.unternehmen_name ?? 'Alle Unternehmen' : 'Alle Unternehmen';
 
-  // Handle shift click
-  function handleShiftClick(shift: EnrichedShift) {
-    setSelectedShift(shift);
-    setDetailSheetOpen(true);
-  }
-
-  // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-background p-4 flex items-center justify-center">
-        <Alert variant="destructive" className="max-w-md">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Fehler</AlertTitle>
-          <AlertDescription className="mt-2">
-            {error.message}
-            <Button variant="outline" size="sm" onClick={fetchData} className="mt-3 w-full">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Erneut versuchen
-            </Button>
-          </AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-transparent px-4 py-8 sm:px-6 lg:px-10">
+        <div className="mx-auto max-w-6xl space-y-4">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Fehler beim Laden</AlertTitle>
+            <AlertDescription className="flex items-center justify-between gap-4">
+              <span>{error.message}</span>
+              <Button variant="outline" onClick={fetchData}>
+                Erneut laden
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
       </div>
     );
   }
 
+  const noData =
+    !loading &&
+    assignmentsWithRefs.length === 0 &&
+    employees.length === 0 &&
+    companies.length === 0 &&
+    shiftTypes.length === 0;
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Schichtplaner</h1>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground hidden sm:block">
-              {format(new Date(), 'EEEE, dd. MMMM yyyy', { locale: de })}
-            </span>
-            {/* Desktop add button */}
-            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="hidden md:flex">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Neue Schicht
+    <div className="min-h-screen bg-transparent px-4 py-6 sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Schichtplaner</p>
+            <h1 className="text-3xl font-semibold text-foreground">Dashboard</h1>
+            <p className="text-sm text-muted-foreground">
+              Überblick über heutige Besetzung, kommende Schichten und Wochenlast.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={rangeFilter} onValueChange={(value) => setRangeFilter(value as 'week' | 'next' | 'all')}>
+              <SelectTrigger className="w-[170px] border-border">
+                <SelectValue placeholder="Zeitraum" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">Diese Woche</SelectItem>
+                <SelectItem value="next">Nächste 7 Tage</SelectItem>
+                <SelectItem value="all">Alle Schichten</SelectItem>
+              </SelectContent>
+            </Select>
+            <AddShiftDialog
+              employees={employees}
+              companies={companies}
+              shiftTypes={shiftTypes}
+              onSuccess={fetchData}
+              trigger={
+                <Button className="gap-2 shadow-[0_12px_24px_rgba(34,41,47,0.12)]">
+                  <Plus className="h-4 w-4" />
+                  Schicht zuweisen
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Schicht eintragen</DialogTitle>
-                </DialogHeader>
-                <AddShiftForm
-                  employees={employees}
-                  shiftTypes={shiftTypes}
-                  companies={companies}
-                  onSuccess={handleAddSuccess}
-                  onCancel={() => setAddDialogOpen(false)}
-                />
-              </DialogContent>
-            </Dialog>
+              }
+            />
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-          {/* Left column - Main content */}
-          <div className="space-y-6">
-            {/* Today's shifts - Hero section */}
-            <Card className="shadow-[0_4px_6px_rgba(0,0,0,0.05),0_10px_20px_rgba(0,0,0,0.04)]">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <span>Heute</span>
-                    <Badge variant="secondary" className="font-normal">
-                      {loading ? '...' : `${todaysShifts.length} Schichten`}
-                    </Badge>
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
+        {noData ? (
+          <EmptyState onRetry={fetchData} />
+        ) : (
+          <>
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2">
                 {loading ? (
-                  <ShiftsSkeleton />
-                ) : todaysShifts.length === 0 ? (
-                  <EmptyState
-                    title="Keine Schichten heute"
-                    description="Für heute sind keine Schichten eingetragen."
-                    action={
-                      <Button variant="outline" onClick={() => setAddDialogOpen(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Schicht eintragen
-                      </Button>
-                    }
+                  <Skeleton className="h-[260px] w-full rounded-2xl" />
+                ) : (
+                  <HeroCard
+                    assigned={todaysAssignments.length}
+                    goal={coverageGoal}
+                    dateLabel={heroDateLabel}
+                    companyLabel={companyLabel}
+                    onAdjustGoal={(value) => setGoalOverride(Number(value) || coverageGoal)}
                   />
-                ) : (
-                  <div className="space-y-3">
-                    {todaysShifts.map((shift) => (
-                      <ShiftCard
-                        key={shift.record_id}
-                        shift={shift}
-                        isActive={isShiftActive(shift)}
-                        onClick={() => handleShiftClick(shift)}
-                      />
-                    ))}
-                  </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+              <div className="lg:col-span-1">
+                <NextShifts assignments={upcomingAssignments} loading={loading} />
+              </div>
+            </div>
 
-            {/* Upcoming shifts */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Nächste 7 Tage</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <Skeleton key={i} className="h-10 w-full" />
-                    ))}
-                  </div>
-                ) : upcomingShifts.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Keine Schichten in den nächsten 7 Tagen
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {upcomingShifts.map((shift) => (
-                      <CompactShiftRow
-                        key={shift.record_id}
-                        shift={shift}
-                        onClick={() => handleShiftClick(shift)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {kpiCards.map((kpi) => (
+                <KPIChip
+                  key={kpi.title}
+                  title={kpi.title}
+                  value={kpi.value}
+                  subtitle={kpi.subtitle}
+                  icon={kpi.icon}
+                  highlight={kpi.highlight}
+                />
+              ))}
+            </div>
 
-          {/* Right column - Stats */}
-          <div className="space-y-6">
-            {/* Stats grid */}
-            {loading ? (
-              <StatsSkeleton />
-            ) : (
-              <div className="grid grid-cols-3 lg:grid-cols-1 gap-3">
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <Clock className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold">{todaysShifts.length}</div>
-                        <div className="text-xs text-muted-foreground">Schichten heute</div>
-                      </div>
+            <div className="grid gap-6 lg:grid-cols-3">
+              <Card className="lg:col-span-2 border-none shadow-[0_12px_30px_rgba(34,41,47,0.06)]">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Wochenübersicht</CardTitle>
+                    <p className="text-sm text-muted-foreground">Schichten pro Tag</p>
+                  </div>
+                  <Badge variant="secondary" className="gap-1">
+                    <ListChecks className="h-4 w-4" />
+                    {weeklyAssignments.length} geplant
+                  </Badge>
+                </CardHeader>
+                <CardContent className="h-[280px]">
+                  {loading ? (
+                    <Skeleton className="h-full w-full rounded-xl" />
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={weeklyShiftCounts} barSize={28}>
+                        <XAxis
+                          dataKey="day"
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                          axisLine={false}
+                          tickLine={false}
+                          allowDecimals={false}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'var(--card)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '12px',
+                          }}
+                        />
+                        <Bar radius={[10, 10, 8, 8]} dataKey="count" fill="var(--primary)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="space-y-4">
+                <Card className="border-none shadow-[0_12px_30px_rgba(34,41,47,0.06)]">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">Schichtarten-Mix</CardTitle>
+                      <Badge variant="outline" className="gap-1 text-xs">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Woche
+                      </Badge>
                     </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {loading ? (
+                      <Skeleton className="h-[200px] w-full rounded-xl" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="h-[180px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={shiftTypeMix}
+                                dataKey="value"
+                                nameKey="name"
+                                innerRadius={45}
+                                outerRadius={70}
+                                paddingAngle={3}
+                              >
+                                {shiftTypeMix.map((_, idx) => (
+                                  <Cell key={idx} fill={chartColors[idx % chartColors.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'var(--card)',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: '12px',
+                                }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="grid w-full grid-cols-2 gap-2">
+                          {shiftTypeMix.length === 0 && (
+                            <p className="text-sm text-muted-foreground">Noch keine Schichtarten diese Woche.</p>
+                          )}
+                          {shiftTypeMix.map((item, idx) => (
+                            <div
+                              key={item.name}
+                              className="flex items-center justify-between rounded-lg bg-secondary/80 px-3 py-2 text-sm"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="h-2.5 w-2.5 rounded-full"
+                                  style={{ backgroundColor: chartColors[idx % chartColors.length] }}
+                                />
+                                <span>{item.name}</span>
+                              </div>
+                              <span className="text-muted-foreground">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-chart-2/10">
-                        <Calendar className="h-5 w-5 text-chart-2" />
+                <Card className="border-none shadow-[0_12px_30px_rgba(34,41,47,0.06)]">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-muted-foreground">Sofortmaßnahmen</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-primary" />
+                        <span className="text-sm">Mitarbeiter ohne Schicht</span>
                       </div>
-                      <div>
-                        <div className="text-2xl font-bold">{weekShiftsCount}</div>
-                        <div className="text-xs text-muted-foreground">Diese Woche</div>
-                      </div>
+                      <Badge variant="outline">{employeesWithoutToday}</Badge>
                     </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-chart-3/10">
-                        <Users className="h-5 w-5 text-chart-3" />
+                    <div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <ListChecks className="h-4 w-4 text-accent" />
+                        <span className="text-sm">Freie Slots heute</span>
                       </div>
-                      <div>
-                        <div className="text-2xl font-bold">{employees.length}</div>
-                        <div className="text-xs text-muted-foreground">Mitarbeiter</div>
-                      </div>
+                      <Badge variant="outline">{freeSlotsToday}</Badge>
                     </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="hover:shadow-md transition-shadow lg:block hidden">
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-chart-4/10">
-                        <Building2 className="h-5 w-5 text-chart-4" />
+                    <div className="flex items-center justify-between rounded-xl bg-secondary px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">Top-Schichtart</span>
                       </div>
-                      <div>
-                        <div className="text-2xl font-bold">{companies.length}</div>
-                        <div className="text-xs text-muted-foreground">Unternehmen</div>
-                      </div>
+                      <Badge variant="outline">{mostUsedShift?.name ?? 'Noch offen'}</Badge>
                     </div>
                   </CardContent>
                 </Card>
               </div>
-            )}
-
-            {/* Shift types overview - Desktop only */}
-            <Card className="hidden lg:block">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Schichtarten</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-8 w-full" />
-                    ))}
-                  </div>
-                ) : shiftTypes.length === 0 ? (
-                  <div className="text-sm text-muted-foreground text-center py-4">
-                    Keine Schichtarten definiert
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {shiftTypes.map((type) => (
-                      <div
-                        key={type.record_id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
-                      >
-                        <span className="font-medium text-sm">{type.fields.schichtart_name || 'Unbenannt'}</span>
-                        {type.fields.schichtart_beginn && type.fields.schichtart_ende && (
-                          <span className="text-xs text-muted-foreground font-mono">
-                            {type.fields.schichtart_beginn} - {type.fields.schichtart_ende}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </main>
-
-      {/* Mobile fixed bottom action button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur border-t border-border md:hidden">
-        <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="w-full h-12 text-base">
-              <Plus className="h-5 w-5 mr-2" />
-              Schicht eintragen
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Schicht eintragen</DialogTitle>
-            </DialogHeader>
-            <AddShiftForm
-              employees={employees}
-              shiftTypes={shiftTypes}
-              companies={companies}
-              onSuccess={handleAddSuccess}
-              onCancel={() => setAddDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+            </div>
+          </>
+        )}
       </div>
-
-      {/* Bottom padding for mobile to account for fixed button */}
-      <div className="h-20 md:hidden" />
-
-      {/* Shift detail sheet */}
-      <ShiftDetailSheet
-        shift={selectedShift}
-        open={detailSheetOpen}
-        onOpenChange={setDetailSheetOpen}
-      />
+      <div className="pointer-events-none fixed bottom-6 right-4 z-50 block sm:hidden">
+        <AddShiftDialog
+          employees={employees}
+          companies={companies}
+          shiftTypes={shiftTypes}
+          onSuccess={fetchData}
+          trigger={
+            <Button
+              size="lg"
+              className="pointer-events-auto h-14 gap-2 rounded-full bg-primary px-6 text-primary-foreground shadow-[0_20px_40px_rgba(34,41,47,0.18)]"
+            >
+              <Plus className="h-5 w-5" />
+              Schicht zuweisen
+            </Button>
+          }
+        />
+      </div>
     </div>
   );
 }

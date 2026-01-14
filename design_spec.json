@@ -1,0 +1,98 @@
+{
+  "app": "Schichtplaner Dashboard",
+  "hero": {
+    "title": "Heutige Besetzung",
+    "data_source": "schichteinteilung",
+    "calculation": "count assignments with zuweisung_datum == today; coverage = assigned/goal",
+    "display": "large assigned/goal number with progress bar and date/company badges"
+  },
+  "kpis": [
+    {
+      "name": "Schichten diese Woche",
+      "source": "schichteinteilung",
+      "calc": "count assignments in current week",
+      "format": "int"
+    },
+    {
+      "name": "Freie Slots heute",
+      "source": "schichteinteilung",
+      "calc": "max(goal - assigned today, 0)",
+      "format": "int"
+    },
+    {
+      "name": "Meistgenutzte Schichtart",
+      "source": "schichteinteilung + schichtartenverwaltung",
+      "calc": "mode of zuweisung_schichtart in current week",
+      "format": "text+count"
+    },
+    {
+      "name": "Mitarbeiter ohne Schicht heute",
+      "source": "mitarbeiterverwaltung + schichteinteilung",
+      "calc": "employees minus those assigned today",
+      "format": "int"
+    }
+  ],
+  "charts": [
+    {
+      "type": "bar",
+      "title": "Wochenübersicht",
+      "question": "Wie sind die Schichten über die Woche verteilt?",
+      "source": "schichteinteilung",
+      "x": "zuweisung_datum (day label)",
+      "y": "count assignments"
+    },
+    {
+      "type": "donut",
+      "title": "Schichtarten-Mix",
+      "question": "Welche Schichtarten dominieren diese Woche?",
+      "source": "schichteinteilung + schichtartenverwaltung",
+      "category": "zuweisung_schichtart"
+    }
+  ],
+  "list": {
+    "title": "Nächste Schichten",
+    "source": "schichteinteilung",
+    "fields": [
+      "mitarbeiter_name",
+      "unternehmen",
+      "schichtart",
+      "datum",
+      "zeitfenster",
+      "notiz_indikator"
+    ],
+    "sort": ["zuweisung_datum", "zuweisung_beginn"],
+    "limit": { "desktop": 8, "mobile": 5 }
+  },
+  "primary_action": {
+    "label": "Schicht zuweisen",
+    "action": "add_record",
+    "target_app": "schichteinteilung",
+    "fields": [
+      "zuweisung_mitarbeiter",
+      "zuweisung_unternehmen",
+      "zuweisung_schichtart",
+      "zuweisung_datum",
+      "zuweisung_beginn",
+      "zuweisung_ende",
+      "zuweisung_notiz"
+    ],
+    "placement": { "mobile": "bottom_fixed", "desktop": "header" }
+  },
+  "theme": {
+    "font": "Manrope",
+    "colors": {
+      "background": "hsl(42 42% 97%)",
+      "foreground": "hsl(220 24% 16%)",
+      "card": "hsl(0 0% 100%)",
+      "card_foreground": "hsl(220 24% 16%)",
+      "border": "hsl(36 22% 86%)",
+      "primary": "hsl(35 86% 55%)",
+      "primary_foreground": "hsl(42 100% 98%)",
+      "accent": "hsl(28 78% 64%)",
+      "muted": "hsl(40 24% 94%)",
+      "muted_foreground": "hsl(220 12% 40%)",
+      "success": "hsl(142 45% 36%)",
+      "destructive": "hsl(0 68% 50%)"
+    }
+  }
+}
