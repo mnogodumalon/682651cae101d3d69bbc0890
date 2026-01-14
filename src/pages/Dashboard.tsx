@@ -73,7 +73,6 @@ import {
   isBefore,
   isSameDay,
   isWithinInterval,
-  parse,
   parseISO,
   startOfWeek,
 } from 'date-fns';
