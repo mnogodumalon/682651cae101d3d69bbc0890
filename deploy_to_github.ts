@@ -151,23 +151,64 @@ async function deploy(): Promise<void> {
   runGitCmd("git config --global user.email 'lilo@livinglogic.de'");
   runGitCmd("git config --global user.name 'Lilo'");
 
+  // Clean up any existing git state first
+  try {
+    execSync("rm -rf .git", { cwd: APP_DIR, stdio: "pipe" });
+  } catch {
+    // Ignore if .git doesn't exist
+  }
+  
+  // Clean up temp directories from previous attempts
+  try {
+    execSync("rm -rf /tmp/old_repo", { stdio: "pipe" });
+  } catch {
+    // Ignore
+  }
+
   // Check if repo exists and preserve history
   log("Checking if repository already exists...");
+  let hasExistingRepo = false;
   try {
     runGitCmd(`git clone ${gitPushUrl} /tmp/old_repo`);
     runGitCmd("cp -r /tmp/old_repo/.git /home/user/app/.git");
     logSuccess("History from existing repo preserved");
+    hasExistingRepo = true;
   } catch {
     // New repo - initialize from scratch
     logSuccess("New repository - initializing");
     runGitCmd("git init");
-    runGitCmd("git checkout -b main");
-    runGitCmd(`git remote add origin ${gitPushUrl}`);
   }
+  
+  // Ensure we're on main branch
+  try {
+    runGitCmd("git checkout main");
+  } catch {
+    try {
+      runGitCmd("git checkout -b main");
+    } catch {
+      // Already on main or branch exists, that's fine
+    }
+  }
+  
+  // Set up remote (remove first if exists)
+  try {
+    runGitCmd("git remote remove origin");
+  } catch {
+    // Remote doesn't exist, that's fine
+  }
+  runGitCmd(`git remote add origin ${gitPushUrl}`);
 
   // Commit and push
   runGitCmd("git add -A");
-  runGitCmd("git commit -m 'Lilo Auto-Deploy' --allow-empty");
+  
+  // Only commit if there are changes or if it's a new repo
+  try {
+    runGitCmd("git commit -m 'Lilo Auto-Deploy'");
+  } catch {
+    // No changes to commit, that's okay - still push
+    log("No changes to commit, pushing existing state...");
+  }
+  
   runGitCmd("git push origin main --force");
 
   logSuccess("Push successful!");

@@ -60,17 +60,26 @@ async function main(): Promise<void> {
     },
   });
 
+  // Model configuration - change this to use different models
+  // Available models depend on your subscription:
+  // - "o3" / "o3-mini" - Latest reasoning models
+  // - "gpt-4.1" - GPT-4.1 
+  // - "gpt-5-codex" - Codex-optimized (default)
+  const model = process.env.CODEX_MODEL || "gpt-5.2-codex"; // Default to o3
+  
   // Start a new thread with working directory and full permissions
-  logStatus("[CODEX] Erstelle Thread mit workingDirectory: /home/user/app");
+  logStatus(`[CODEX] Erstelle Thread mit Model: ${model}`);
   logStatus("[CODEX] approvalPolicy: never, sandboxMode: danger-full-access");
   
   const thread = codex.startThread({
+    model: model,
     workingDirectory: "/home/user/app",
     skipGitRepoCheck: true, // We handle git ourselves in deploy script
     approvalPolicy: "never", // No approval needed - fully autonomous
     sandboxMode: "danger-full-access", // Full file system access
     networkAccessEnabled: true, // Allow network for npm etc
     webSearchEnabled: false, // Don't need web search
+    modelReasoningEffort: "high", // Use more reasoning for complex tasks
   });
   
   logStatus("[CODEX] Thread erstellt mit Full-Auto Mode");
@@ -92,12 +101,14 @@ PFLICHT-SCHRITTE (alle müssen ausgeführt werden):
 2. ÄNDERN: Implementiere die User-Anfrage
 3. TESTEN: Führe 'npm run build' aus um sicherzustellen dass es kompiliert
 4. DEPLOYEN: Führe 'npx ts-node deploy_to_github.ts' aus um die Änderungen zu pushen
+   Die Umgebungsvariablen sind bereits gesetzt - NICHT mit Dummy-Werten testen!
 
 ⚠️ KRITISCH:
 - Du MUSST Änderungen am Code machen!
-- Du MUSST am Ende das Deploy-Skript ausführen!
+- Du MUSST am Ende das Deploy-Skript ausführen: npx ts-node deploy_to_github.ts
 - Beende NICHT ohne zu deployen!
 - Analysieren alleine reicht NICHT - du musst HANDELN!
+- KEINE lokalen Test-Repos! Nutze die echten Umgebungsvariablen!
 
 Das Dashboard existiert bereits. Mache NUR die angeforderten Änderungen, nicht mehr.
 Starte JETZT mit Schritt 1!`;
@@ -132,13 +143,17 @@ Teste den Build:
 npm run build
 
 SCHRITT 6:
-Deploye das Dashboard:
+Deploye das Dashboard - verwende die ECHTEN Umgebungsvariablen:
 npx ts-node deploy_to_github.ts
+
+Die Umgebungsvariablen GIT_PUSH_URL, REPO_NAME und LIVINGAPPS_API_KEY sind bereits gesetzt!
+Du musst sie NICHT manuell setzen oder mit Dummy-Werten testen!
 
 ⚠️ KRITISCH:
 - Du MUSST Code schreiben! Analysieren alleine reicht NICHT!
-- Du MUSST am Ende deployen!
+- Du MUSST am Ende deployen mit: npx ts-node deploy_to_github.ts (OHNE eigene env vars!)
 - Die Types und Services existieren bereits in src/types/ und src/services/
+- Teste NICHT mit lokalen Dummy-Repos! Nutze die echten Umgebungsvariablen!
 
 STARTE JETZT MIT SCHRITT 1: Lies CLAUDE.md!`;
   }

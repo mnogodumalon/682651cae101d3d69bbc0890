@@ -1,98 +1,72 @@
 {
-  "app": "Schichtplaner Dashboard",
-  "hero": {
-    "title": "Heutige Besetzung",
-    "data_source": "schichteinteilung",
-    "calculation": "count assignments with zuweisung_datum == today; coverage = assigned/goal",
-    "display": "large assigned/goal number with progress bar and date/company badges"
-  },
   "kpis": [
     {
-      "name": "Schichten diese Woche",
-      "source": "schichteinteilung",
-      "calc": "count assignments in current week",
-      "format": "int"
+      "id": "total_shifts_today",
+      "label": "Schichten heute",
+      "description": "Gesamtzahl geplanter Schichten für heute"
     },
     {
-      "name": "Freie Slots heute",
-      "source": "schichteinteilung",
-      "calc": "max(goal - assigned today, 0)",
-      "format": "int"
+      "id": "coverage_today",
+      "label": "Abdeckung heute",
+      "description": "Anteil der Schichten mit zugewiesenem Mitarbeiter",
+      "format": "percentage"
     },
     {
-      "name": "Meistgenutzte Schichtart",
-      "source": "schichteinteilung + schichtartenverwaltung",
-      "calc": "mode of zuweisung_schichtart in current week",
-      "format": "text+count"
-    },
-    {
-      "name": "Mitarbeiter ohne Schicht heute",
-      "source": "mitarbeiterverwaltung + schichteinteilung",
-      "calc": "employees minus those assigned today",
-      "format": "int"
+      "id": "employees_scheduled_today",
+      "label": "Eingesetzte Mitarbeiter heute",
+      "description": "Anzahl unterschiedlicher Mitarbeiter mit Schichten heute"
     }
   ],
   "charts": [
     {
+      "id": "shifts_per_day",
       "type": "bar",
-      "title": "Wochenübersicht",
-      "question": "Wie sind die Schichten über die Woche verteilt?",
-      "source": "schichteinteilung",
-      "x": "zuweisung_datum (day label)",
-      "y": "count assignments"
+      "label": "Schichten pro Tag (nächste 7 Tage)",
+      "dataset": "shifts_per_day",
+      "x": "date",
+      "y": "count"
     },
     {
-      "type": "donut",
-      "title": "Schichtarten-Mix",
-      "question": "Welche Schichtarten dominieren diese Woche?",
-      "source": "schichteinteilung + schichtartenverwaltung",
-      "category": "zuweisung_schichtart"
+      "id": "shift_type_distribution",
+      "type": "pie",
+      "label": "Verteilung Schichtarten (nächste 7 Tage)",
+      "dataset": "shift_type_distribution",
+      "value": "count",
+      "name": "shiftType"
+    },
+    {
+      "id": "employee_load",
+      "type": "bar",
+      "label": "Schichten pro Mitarbeiter (nächste 7 Tage)",
+      "dataset": "employee_load",
+      "x": "employee",
+      "y": "count"
     }
   ],
-  "list": {
-    "title": "Nächste Schichten",
-    "source": "schichteinteilung",
-    "fields": [
-      "mitarbeiter_name",
-      "unternehmen",
-      "schichtart",
-      "datum",
-      "zeitfenster",
-      "notiz_indikator"
-    ],
-    "sort": ["zuweisung_datum", "zuweisung_beginn"],
-    "limit": { "desktop": 8, "mobile": 5 }
+  "colors": {
+    "primary": "#2E86AB",
+    "secondary": "#E84855",
+    "accent": "#FDBB30",
+    "background": "#F4F6F8",
+    "text": "#1F1F1F"
   },
-  "primary_action": {
-    "label": "Schicht zuweisen",
-    "action": "add_record",
-    "target_app": "schichteinteilung",
-    "fields": [
-      "zuweisung_mitarbeiter",
-      "zuweisung_unternehmen",
-      "zuweisung_schichtart",
-      "zuweisung_datum",
-      "zuweisung_beginn",
-      "zuweisung_ende",
-      "zuweisung_notiz"
+  "layout": {
+    "desktop": [
+      { "component": "kpi", "id": "total_shifts_today", "gridArea": "kpi1" },
+      { "component": "kpi", "id": "coverage_today", "gridArea": "kpi2" },
+      { "component": "kpi", "id": "employees_scheduled_today", "gridArea": "kpi3" },
+      { "component": "chart", "id": "shifts_per_day", "gridArea": "chart1" },
+      { "component": "chart", "id": "shift_type_distribution", "gridArea": "chart2" },
+      { "component": "chart", "id": "employee_load", "gridArea": "chart3" }
     ],
-    "placement": { "mobile": "bottom_fixed", "desktop": "header" }
-  },
-  "theme": {
-    "font": "Manrope",
-    "colors": {
-      "background": "hsl(42 42% 97%)",
-      "foreground": "hsl(220 24% 16%)",
-      "card": "hsl(0 0% 100%)",
-      "card_foreground": "hsl(220 24% 16%)",
-      "border": "hsl(36 22% 86%)",
-      "primary": "hsl(35 86% 55%)",
-      "primary_foreground": "hsl(42 100% 98%)",
-      "accent": "hsl(28 78% 64%)",
-      "muted": "hsl(40 24% 94%)",
-      "muted_foreground": "hsl(220 12% 40%)",
-      "success": "hsl(142 45% 36%)",
-      "destructive": "hsl(0 68% 50%)"
-    }
+    "mobile": [
+      { "component": "kpi", "id": "total_shifts_today" },
+      { "component": "kpi", "id": "coverage_today" },
+      { "component": "kpi", "id": "employees_scheduled_today" },
+      { "component": "chart", "id": "shifts_per_day" },
+      { "component": "chart", "id": "shift_type_distribution" },
+      { "component": "chart", "id": "employee_load" }
+    ]
   }
 }
+
