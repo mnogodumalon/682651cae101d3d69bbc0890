@@ -18,6 +18,8 @@
  */
 
 import { Codex } from "@openai/codex-sdk";
+import * as fs from "fs";
+import * as path from "path";
 
 // Output types for streaming to parent process (matches claude_agent.py format)
 interface OutputMessage {
@@ -35,6 +37,45 @@ function log(message: OutputMessage): void {
 
 function logStatus(content: string): void {
   log({ type: "status", content });
+}
+
+/**
+ * Load project context like claude_agent.py's setting_sources=["project"]
+ * This reads CLAUDE.md and all skill files to inject as context
+ */
+function loadProjectContext(workingDir: string): string {
+  const contextParts: string[] = [];
+  
+  // 1. Load CLAUDE.md (main instructions)
+  const claudeMdPath = path.join(workingDir, "CLAUDE.md");
+  if (fs.existsSync(claudeMdPath)) {
+    const claudeMd = fs.readFileSync(claudeMdPath, "utf-8");
+    contextParts.push("# PROJECT INSTRUCTIONS (CLAUDE.md)\n\n" + claudeMd);
+    logStatus(`[CODEX] Loaded CLAUDE.md (${claudeMd.length} chars)`);
+  } else {
+    logStatus("[CODEX] ⚠️ CLAUDE.md not found!");
+  }
+  
+  // 2. Load all skills from .claude/skills/
+  const skillsDir = path.join(workingDir, ".claude", "skills");
+  if (fs.existsSync(skillsDir)) {
+    const skillFolders = fs.readdirSync(skillsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+    
+    for (const skillFolder of skillFolders) {
+      const skillPath = path.join(skillsDir, skillFolder, "SKILL.md");
+      if (fs.existsSync(skillPath)) {
+        const skillContent = fs.readFileSync(skillPath, "utf-8");
+        contextParts.push(`\n\n# SKILL: ${skillFolder}\n\n${skillContent}`);
+        logStatus(`[CODEX] Loaded skill: ${skillFolder} (${skillContent.length} chars)`);
+      }
+    }
+  } else {
+    logStatus("[CODEX] ⚠️ .claude/skills/ directory not found!");
+  }
+  
+  return contextParts.join("\n\n---\n\n");
 }
 
 async function main(): Promise<void> {
@@ -84,6 +125,12 @@ async function main(): Promise<void> {
   
   logStatus("[CODEX] Thread erstellt mit Full-Auto Mode");
 
+  // Load project context (like claude_agent.py's setting_sources=["project"])
+  const workingDir = "/home/user/app";
+  const projectContext = loadProjectContext(workingDir);
+  
+  logStatus(`[CODEX] Loaded project context: ${projectContext.length} chars total`);
+
   // Build the query based on mode
   let query: string;
 
@@ -91,14 +138,18 @@ async function main(): Promise<void> {
     // Continue Mode: Custom prompt from user
     logStatus(`[CODEX] Continue-Mode mit User-Prompt: ${userPrompt}`);
     
-    query = `🚨 AUFGABE: Du MUSST das existierende Dashboard ändern und deployen!
+    query = `${projectContext}
+
+---
+
+🚨 AUFGABE: Du MUSST das existierende Dashboard ändern und deployen!
 
 User-Anfrage: "${userPrompt}"
 
 PFLICHT-SCHRITTE (alle müssen ausgeführt werden):
 
 1. LESEN: Lies src/pages/Dashboard.tsx um die aktuelle Struktur zu verstehen
-2. ÄNDERN: Implementiere die User-Anfrage
+2. ÄNDERN: Implementiere die User-Anfrage gemäß den obigen Skills und Anleitungen
 3. TESTEN: Führe 'npm run build' aus um sicherzustellen dass es kompiliert
 4. DEPLOYEN: Führe 'npx ts-node deploy_to_github.ts' aus um die Änderungen zu pushen
    Die Umgebungsvariablen sind bereits gesetzt - NICHT mit Dummy-Werten testen!
@@ -117,45 +168,50 @@ Starte JETZT mit Schritt 1!`;
     // Build Mode: Create new dashboard
     logStatus("[CODEX] Build-Mode: Neues Dashboard erstellen");
     
-    query = `Du bist ein Dashboard-Generator für Living Apps. Du MUSST jetzt ein Dashboard bauen!
+    query = `${projectContext}
 
-SCHRITT 1 - SOFORT AUSFÜHREN:
-Lies die Datei CLAUDE.md mit dem Read-Tool um die Anleitung zu verstehen.
+---
 
-SCHRITT 2:
+# DEINE AUFGABE: Dashboard bauen!
+
+Du hast oben alle Anleitungen und Skills erhalten. Jetzt baue das Dashboard!
+
+## SCHRITT 1: App-Struktur verstehen
 Lies app_metadata.json um die App-Struktur und Felder zu verstehen.
 
-SCHRITT 3:
-Erstelle design_spec.json mit dem Design für das Dashboard:
+## SCHRITT 2: Design erstellen (frontend-design Skill)
+Erstelle design_brief.md mit dem Design für das Dashboard:
 - Welche KPIs sind wichtig?
 - Welche Charts passen zu den Daten?
 - Welches Farbschema?
+- Mobile vs Desktop Layout
 
-SCHRITT 4:
-Erstelle src/pages/Dashboard.tsx basierend auf design_spec.json:
+Folge dem frontend-design Skill oben GENAU!
+
+## SCHRITT 3: Dashboard implementieren (frontend-impl Skill)
+Erstelle src/pages/Dashboard.tsx basierend auf design_brief.md:
 - Importiere die Types aus src/types/app.ts
 - Nutze den Service aus src/services/livingAppsService.ts
 - Verwende shadcn/ui Komponenten
 - Füge recharts Charts hinzu
 
-SCHRITT 5:
-Teste den Build:
+Folge dem frontend-impl Skill oben GENAU!
+
+## SCHRITT 4: Build testen
 npm run build
 
-SCHRITT 6:
-Deploye das Dashboard - verwende die ECHTEN Umgebungsvariablen:
+## SCHRITT 5: Deployen
 npx ts-node deploy_to_github.ts
 
 Die Umgebungsvariablen GIT_PUSH_URL, REPO_NAME und LIVINGAPPS_API_KEY sind bereits gesetzt!
-Du musst sie NICHT manuell setzen oder mit Dummy-Werten testen!
 
 ⚠️ KRITISCH:
 - Du MUSST Code schreiben! Analysieren alleine reicht NICHT!
-- Du MUSST am Ende deployen mit: npx ts-node deploy_to_github.ts (OHNE eigene env vars!)
+- Du MUSST am Ende deployen mit: npx ts-node deploy_to_github.ts
 - Die Types und Services existieren bereits in src/types/ und src/services/
 - Teste NICHT mit lokalen Dummy-Repos! Nutze die echten Umgebungsvariablen!
 
-STARTE JETZT MIT SCHRITT 1: Lies CLAUDE.md!`;
+STARTE JETZT MIT SCHRITT 1!`;
   }
 
   logStatus("[CODEX] Starte Agent...");
