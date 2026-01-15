@@ -42,25 +42,25 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: hsl(30 33% 97%);
-  --foreground: hsl(24 15% 15%);
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(24 15% 15%);
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(24 15% 15%);
-  --primary: hsl(14 74% 55%);
+  --radius: 0.75rem;
+  --background: hsl(34 36% 97%);
+  --foreground: hsl(210 18% 18%);
+  --card: hsl(30 20% 99%);
+  --card-foreground: hsl(210 18% 18%);
+  --popover: hsl(30 20% 99%);
+  --popover-foreground: hsl(210 18% 18%);
+  --primary: hsl(18 84% 52%);
   --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(30 33% 95%);
-  --secondary-foreground: hsl(24 15% 15%);
-  --muted: hsl(30 33% 95%);
-  --muted-foreground: hsl(24 8% 40%);
-  --accent: hsl(36 100% 50%);
-  --accent-foreground: hsl(24 15% 15%);
-  --destructive: hsl(0 70% 52%);
-  --border: hsl(24 20% 90%);
-  --input: hsl(24 20% 90%);
-  --ring: hsl(14 74% 55%);
+  --secondary: hsl(32 30% 92%);
+  --secondary-foreground: hsl(210 18% 22%);
+  --muted: hsl(32 25% 93%);
+  --muted-foreground: hsl(210 10% 45%);
+  --accent: hsl(186 55% 35%);
+  --accent-foreground: hsl(0 0% 100%);
+  --destructive: hsl(0 72% 55%);
+  --border: hsl(210 20% 88%);
+  --input: hsl(210 20% 88%);
+  --ring: hsl(186 55% 35%);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -116,5 +116,6 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "Space Grotesk", sans-serif;
   }
 }

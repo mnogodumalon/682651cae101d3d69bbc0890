@@ -69,7 +69,7 @@ async function main(): Promise<void> {
   // - "o3" / "o3-mini" - Latest reasoning models
   // - "gpt-4.1" - GPT-4.1 
   // - "gpt-5-codex" - Codex-optimized (default)
-  const model = process.env.CODEX_MODEL || "gpt-5.2-codex"; // Default to o3
+  const model = process.env.CODEX_MODEL || "gpt-5.2-codex"; // Default to gpt-5.2-codex
   
   // Start a new thread with working directory and full permissions
   logStatus(`[CODEX] Erstelle Thread mit Model: ${model}`);
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
     sandboxMode: "danger-full-access", // Full file system access
     networkAccessEnabled: true, // Allow network for npm etc
     webSearchEnabled: false, // Don't need web search
-    modelReasoningEffort: "high", // Use more reasoning for complex tasks
+    modelReasoningEffort: "high", // Use more reasoning for complex tasks (valid: low, medium, high)
   });
   
   logStatus("[CODEX] Thread erstellt mit Full-Auto Mode");
