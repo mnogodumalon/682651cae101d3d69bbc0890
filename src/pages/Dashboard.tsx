@@ -1,4 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  LivingAppsService,
+  extractRecordId,
+} from '@/services/livingAppsService'
+
+import type {
+  Schichteinteilung,
+  Schichtartenverwaltung,
+} from '@/types/app'
+
 import {
   Card,
   CardContent,
@@ -6,264 +16,249 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Spinner } from '@/components/ui/spinner'
+
+import { Skeleton } from '@/components/ui/skeleton'
+
 import {
-  LineChart,
-  Line,
-  CartesianGrid,
+  ChartContainer,
+  ChartLegendContent,
+  ChartTooltipContent,
+} from '@/components/ui/chart'
+
+import {
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
-  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
 } from 'recharts'
-import { format, isSameDay, parseISO, subDays, addDays, isAfter, isBefore } from 'date-fns'
 
-import type {
-  Schichteinteilung,
-  Schichtartenverwaltung,
-  Mitarbeiterverwaltung,
-} from '@/types/app'
+import {
+  format,
+  isToday,
+  parseISO,
+  addDays,
+  isWithinInterval,
+  subDays,
+} from 'date-fns'
 
-import { LivingAppsService, extractRecordId } from '@/services/livingAppsService'
+import design from '@/../design_spec.json'
 
-// Color scheme taken from design_spec.json
-const COLORS = ['#0d9488', '#0ea5e9', '#facc15', '#fb923c', '#a78bfa', '#f472b6']
+// Colors from design specification
+const COLORS = design.colors
 
-interface StatCardProps {
-  label: string
-  value: number | string
-}
-
-function StatCard({ label, value }: StatCardProps) {
-  return (
-    <Card className="flex-1">
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold">{value}</CardTitle>
-        <CardDescription>{label}</CardDescription>
-      </CardHeader>
-    </Card>
-  )
-}
-
-export default function Dashboard() {
-  const [shifts, setShifts] = useState<Schichteinteilung[]>()
-  const [shiftTypes, setShiftTypes] = useState<Schichtartenverwaltung[]>()
-  const [employees, setEmployees] = useState<Mitarbeiterverwaltung[]>()
-  const [loading, setLoading] = useState(false)
+function Dashboard() {
+  const [loading, setLoading] = useState(true)
+  const [shifts, setShifts] = useState<Schichteinteilung[]>([])
+  const [shiftTypesMap, setShiftTypesMap] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    async function load() {
-      setLoading(true)
+    async function fetchData() {
       try {
-        const [sh, st, emp] = await Promise.all([
+        const [shiftData, shiftTypes] = await Promise.all([
           LivingAppsService.getSchichteinteilung(),
           LivingAppsService.getSchichtartenverwaltung(),
-          LivingAppsService.getMitarbeiterverwaltung(),
         ])
-        setShifts(sh)
-        setShiftTypes(st)
-        setEmployees(emp)
-      } catch (err) {
-        console.error('Error loading data', err)
+
+        setShifts(shiftData)
+
+        const map: Record<string, string> = {}
+        shiftTypes.forEach((t: Schichtartenverwaltung) => {
+          map[t.record_id] = t.fields.schichtart_name || 'Unbenannt'
+        })
+        setShiftTypesMap(map)
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(error)
       } finally {
         setLoading(false)
       }
     }
-    load()
+
+    fetchData()
   }, [])
 
-  const today = format(new Date(), 'yyyy-MM-dd')
+  /**
+   * KPI Berechnungen
+   */
+  const today = new Date()
 
-  const stats = useMemo(() => {
-    if (!shifts || !employees || !shiftTypes) return null
-
-    const total_shifts = shifts.length
-    const shifts_today = shifts.filter((s) =>
-      s.fields.zuweisung_datum ? s.fields.zuweisung_datum === today : false
-    ).length
-    const employees_count = employees.length
-    const shift_types_count = shiftTypes.length
-
-    return {
-      total_shifts,
-      shifts_today,
-      employees_count,
-      shift_types_count,
+  const kpi = useMemo(() => {
+    if (!shifts.length) {
+      return {
+        totalToday: 0,
+        next7Days: 0,
+        employeesToday: 0,
+      }
     }
-  }, [shifts, employees, shiftTypes, today])
 
-  // Data for line chart (last 30 days)
-  const lineData = useMemo(() => {
-    if (!shifts) return []
-    const startDate = subDays(new Date(), 29) // includes today
-    const map: Record<string, number> = {}
+    const totalToday = shifts.filter((s) => {
+      const dateStr = s.fields.zuweisung_datum
+      if (!dateStr) return false
+      return isToday(parseISO(dateStr))
+    }).length
+
+    const next7Days = shifts.filter((s) => {
+      const dateStr = s.fields.zuweisung_datum
+      if (!dateStr) return false
+      const date = parseISO(dateStr)
+      return isWithinInterval(date, { start: today, end: addDays(today, 7) })
+    }).length
+
+    const employeesSet = new Set<string>()
     shifts.forEach((s) => {
       const dateStr = s.fields.zuweisung_datum
-      if (!dateStr) return
-      const dateObj = parseISO(dateStr)
-      if (isBefore(dateObj, startDate) || isAfter(dateObj, new Date())) return
-      const key = format(dateObj, 'yyyy-MM-dd')
-      map[key] = (map[key] || 0) + 1
+      if (!dateStr || !isToday(parseISO(dateStr))) return
+      const employeeUrl = s.fields.zuweisung_mitarbeiter
+      const id = extractRecordId(employeeUrl) || 'unknown'
+      employeesSet.add(id)
     })
-    const dataArr: { date: string; value: number }[] = []
-    for (let i = 0; i < 30; i++) {
-      const date = addDays(startDate, i)
-      const key = format(date, 'yyyy-MM-dd')
-      dataArr.push({ date: key, value: map[key] || 0 })
-    }
-    return dataArr
-  }, [shifts])
 
-  // Data for pie chart (shift type distribution)
-  const pieData = useMemo(() => {
-    if (!shifts || !shiftTypes) return []
+    return {
+      totalToday,
+      next7Days,
+      employeesToday: employeesSet.size,
+    }
+  }, [shifts, today])
+
+  /**
+   * Chart Daten
+   */
+  const shiftsPerDayData = useMemo(() => {
+    const data: { date: string; count: number }[] = []
+    for (let i = 29; i >= 0; i -= 1) {
+      const date = subDays(today, i)
+      const key = format(date, 'yyyy-MM-dd')
+      const count = shifts.filter((s) => s.fields.zuweisung_datum === key).length
+      data.push({ date: format(date, 'dd.MM'), count })
+    }
+    return data
+  }, [shifts, today])
+
+  const shiftTypeDistribution = useMemo(() => {
     const map: Record<string, number> = {}
     shifts.forEach((s) => {
       const typeUrl = s.fields.zuweisung_schichtart
-      const typeId = extractRecordId(typeUrl)
-      if (!typeId) return
-      map[typeId] = (map[typeId] || 0) + 1
+      const id = extractRecordId(typeUrl) || 'unknown'
+      map[id] = (map[id] || 0) + 1
     })
-    return shiftTypes.map((t) => ({
-      name: t.fields.schichtart_name || 'Unbenannt',
-      value: map[t.record_id] || 0,
+    return Object.entries(map).map(([id, count]) => ({
+      shiftType: shiftTypesMap[id] || 'Unbekannt',
+      count,
     }))
-  }, [shifts, shiftTypes])
+  }, [shifts, shiftTypesMap])
 
-  // Upcoming shifts next 7 days
-  const upcomingShifts = useMemo(() => {
-    if (!shifts) return []
-    const todayDate = new Date()
-    const endDate = addDays(todayDate, 7)
+  const pieColors = Object.values({
+    ...COLORS,
+    fallback1: '#2563eb',
+    fallback2: '#7c3aed',
+    fallback3: '#10b981',
+    fallback4: '#fbbf24',
+  })
 
-    return shifts
-      .filter((s) => {
-        if (!s.fields.zuweisung_datum) return false
-        const d = parseISO(s.fields.zuweisung_datum)
-        return (isAfter(d, todayDate) || isSameDay(d, todayDate)) && isBefore(d, addDays(endDate, 1))
-      })
-      .sort((a, b) => {
-        if (!a.fields.zuweisung_datum || !b.fields.zuweisung_datum) return 0
-        return a.fields.zuweisung_datum.localeCompare(b.fields.zuweisung_datum)
-      })
-      .slice(0, 10) // limit rows
-  }, [shifts])
-
-  const employeeNameById = useMemo(() => {
-    if (!employees) return {}
-    const map: Record<string, string> = {}
-    employees.forEach((e) => {
-      map[e.record_id] = `${e.fields.mitarbeiter_vorname || ''} ${e.fields.mitarbeiter_nachname || ''}`.trim()
-    })
-    return map
-  }, [employees])
-
-  const shiftTypeNameById = useMemo(() => {
-    if (!shiftTypes) return {}
-    const map: Record<string, string> = {}
-    shiftTypes.forEach((st) => {
-      map[st.record_id] = st.fields.schichtart_name || 'Unbenannt'
-    })
-    return map
-  }, [shiftTypes])
-
-  if (loading || !stats) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Spinner className="size-8" />
+      <div className="grid gap-4 p-4">
+        <Skeleton className="h-8" />
+        <Skeleton className="h-24" />
+        <Skeleton className="h-96" />
       </div>
     )
   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen flex flex-col gap-8">
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">Schichtplan Dashboard</h1>
+
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Gesamtanzahl Schichten" value={stats.total_shifts} />
-        <StatCard label="Schichten heute" value={stats.shifts_today} />
-        <StatCard label="Mitarbeitende" value={stats.employees_count} />
-        <StatCard label="Schichtarten" value={stats.shift_types_count} />
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Schichten heute</CardTitle>
+            <CardDescription>Anzahl der heutigen Schichten</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <span className="text-4xl font-bold">{kpi.totalToday}</span>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Nächste 7 Tage</CardTitle>
+            <CardDescription>Schichten in den kommenden 7 Tagen</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <span className="text-4xl font-bold">{kpi.next7Days}</span>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Mitarbeiter heute</CardTitle>
+            <CardDescription>Eingeplante Mitarbeiter heute</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <span className="text-4xl font-bold">{kpi.employeesToday}</span>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid gap-6 mt-8 grid-cols-1 lg:grid-cols-2">
+        {/* Bar Chart */}
         <Card>
           <CardHeader>
             <CardTitle>Schichten pro Tag (letzte 30 Tage)</CardTitle>
-            <CardDescription>Zeitlicher Verlauf der Anzahl Schichten</CardDescription>
           </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickFormatter={(d) => format(parseISO(d), 'dd.MM')} />
-                <YAxis allowDecimals={false} />
-                <Tooltip labelFormatter={(d) => format(parseISO(String(d)), 'PPP')} />
-                <Line type="monotone" dataKey="value" stroke="#0d9488" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
+          <CardContent>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={shiftsPerDayData} margin={{ top: 16, right: 24, left: 0, bottom: 0 }}>
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                  <Bar dataKey="count" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
+        {/* Pie Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>Verteilung der Schichtarten</CardTitle>
-            <CardDescription>Anteil nach Schichtart</CardDescription>
+            <CardTitle>Verteilung nach Schichtart</CardTitle>
           </CardHeader>
-          <CardContent className="h-72 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie dataKey="value" data={pieData} outerRadius={100} label={({ name }) => name}>
-                  {pieData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+          <CardContent>
+            <div className="h-80 w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={shiftTypeDistribution}
+                    dataKey="count"
+                    nameKey="shiftType"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={120}
+                    label={(entry) => entry.shiftType}
+                  >
+                    {shiftTypeDistribution.map((_, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={pieColors[index % pieColors.length]}
+                      />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Upcoming Shifts Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Anstehende Schichten (nächste 7 Tage)</CardTitle>
-          <CardDescription>Maximal 10 Einträge</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Datum</TableHead>
-                <TableHead>Mitarbeiter</TableHead>
-                <TableHead>Schichtart</TableHead>
-                <TableHead>Beginn</TableHead>
-                <TableHead>Ende</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {upcomingShifts.map((s) => {
-                const empId = extractRecordId(s.fields.zuweisung_mitarbeiter)
-                const typeId = extractRecordId(s.fields.zuweisung_schichtart)
-                return (
-                  <TableRow key={s.record_id}>
-                    <TableCell>{s.fields.zuweisung_datum}</TableCell>
-                    <TableCell>{empId ? employeeNameById[empId] : '—'}</TableCell>
-                    <TableCell>{typeId ? shiftTypeNameById[typeId] : '—'}</TableCell>
-                    <TableCell>{s.fields.zuweisung_beginn || '—'}</TableCell>
-                    <TableCell>{s.fields.zuweisung_ende || '—'}</TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
     </div>
   )
 }
+
+export default Dashboard

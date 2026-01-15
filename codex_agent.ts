@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   // - "o3" / "o3-mini" - Latest reasoning models
   // - "gpt-4.1" - GPT-4.1 
   // - "gpt-5-codex" - Codex-optimized (default)
-  const model = process.env.CODEX_MODEL || "gpt-5.2-codex"; // Default to o3
+  const model = process.env.CODEX_MODEL || "o3"; // Default to o3
   
   // Start a new thread with working directory and full permissions
   logStatus(`[CODEX] Erstelle Thread mit Model: ${model}`);

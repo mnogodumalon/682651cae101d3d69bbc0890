@@ -1,60 +1,42 @@
 {
   "kpis": [
     {
-      "id": "total_shifts",
-      "label": "Gesamtanzahl Schichten",
-      "description": "Summe aller in der App \"Schichteinteilung\" angelegten Schichten.",
-      "visual": "stat_card"
-    },
-    {
-      "id": "shifts_today",
+      "id": "total_shifts_today",
       "label": "Schichten heute",
-      "description": "Anzahl der Schichten, deren Datum dem heutigen Tag entspricht.",
-      "visual": "stat_card"
+      "description": "Anzahl der für heute geplanten Schichten"
     },
     {
-      "id": "employees",
-      "label": "Mitarbeitende",
-      "description": "Gesamtzahl aller angelegten Mitarbeitenden.",
-      "visual": "stat_card"
+      "id": "shifts_next_7_days",
+      "label": "Schichten nächste 7 Tage",
+      "description": "Gesamtzahl bevorstehender Schichten in den nächsten 7 Tagen"
     },
     {
-      "id": "shift_types",
-      "label": "Schichtarten",
-      "description": "Gesamtzahl verschiedener Schichtarten im System.",
-      "visual": "stat_card"
+      "id": "employees_today",
+      "label": "Eingeplante Mitarbeiter heute",
+      "description": "Anzahl unterschiedlicher Mitarbeiter, die heute Schichten haben"
     }
   ],
   "charts": [
     {
-      "id": "shifts_by_date",
+      "id": "shifts_per_day",
+      "type": "bar",
       "label": "Schichten pro Tag (letzte 30 Tage)",
-      "type": "line",
-      "description": "Zeitlicher Verlauf der Anzahl Schichten, gruppiert nach Datum.",
-      "source": "Schichteinteilung"
+      "dataKey": "count",
+      "xAxis": "date"
     },
     {
-      "id": "shift_type_distribution",
-      "label": "Verteilung der Schichtarten",
+      "id": "shift_types_distribution",
       "type": "pie",
-      "description": "Anteil der verschiedenen Schichtarten an allen geplanten Schichten.",
-      "source": "Schichteinteilung"
+      "label": "Verteilung nach Schichtart",
+      "dataKey": "count",
+      "nameKey": "shiftType"
     }
   ],
-  "tables": [
-    {
-      "id": "upcoming_shifts",
-      "label": "Anstehende Schichten (nächste 7 Tage)",
-      "description": "Liste der kommenden Schichten mit Mitarbeiter, Datum und Schichtart.",
-      "source": "Schichteinteilung"
-    }
-  ],
-  "color_scheme": {
-    "primary": "#0d9488",
-    "secondary": "#0ea5e9",
-    "background": "#f8fafc",
-    "card": "#ffffff",
-    "text_primary": "#0f172a"
+  "colors": {
+    "primary": "#1e40af",
+    "secondary": "#9333ea",
+    "accent": "#06b6d4",
+    "background": "#f8fafc"
   }
 }
 
