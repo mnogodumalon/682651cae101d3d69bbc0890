@@ -1,72 +1,60 @@
 {
   "kpis": [
     {
-      "id": "total_shifts_today",
+      "id": "total_shifts",
+      "label": "Gesamtanzahl Schichten",
+      "description": "Summe aller in der App \"Schichteinteilung\" angelegten Schichten.",
+      "visual": "stat_card"
+    },
+    {
+      "id": "shifts_today",
       "label": "Schichten heute",
-      "description": "Gesamtzahl geplanter Schichten für heute"
+      "description": "Anzahl der Schichten, deren Datum dem heutigen Tag entspricht.",
+      "visual": "stat_card"
     },
     {
-      "id": "coverage_today",
-      "label": "Abdeckung heute",
-      "description": "Anteil der Schichten mit zugewiesenem Mitarbeiter",
-      "format": "percentage"
+      "id": "employees",
+      "label": "Mitarbeitende",
+      "description": "Gesamtzahl aller angelegten Mitarbeitenden.",
+      "visual": "stat_card"
     },
     {
-      "id": "employees_scheduled_today",
-      "label": "Eingesetzte Mitarbeiter heute",
-      "description": "Anzahl unterschiedlicher Mitarbeiter mit Schichten heute"
+      "id": "shift_types",
+      "label": "Schichtarten",
+      "description": "Gesamtzahl verschiedener Schichtarten im System.",
+      "visual": "stat_card"
     }
   ],
   "charts": [
     {
-      "id": "shifts_per_day",
-      "type": "bar",
-      "label": "Schichten pro Tag (nächste 7 Tage)",
-      "dataset": "shifts_per_day",
-      "x": "date",
-      "y": "count"
+      "id": "shifts_by_date",
+      "label": "Schichten pro Tag (letzte 30 Tage)",
+      "type": "line",
+      "description": "Zeitlicher Verlauf der Anzahl Schichten, gruppiert nach Datum.",
+      "source": "Schichteinteilung"
     },
     {
       "id": "shift_type_distribution",
+      "label": "Verteilung der Schichtarten",
       "type": "pie",
-      "label": "Verteilung Schichtarten (nächste 7 Tage)",
-      "dataset": "shift_type_distribution",
-      "value": "count",
-      "name": "shiftType"
-    },
-    {
-      "id": "employee_load",
-      "type": "bar",
-      "label": "Schichten pro Mitarbeiter (nächste 7 Tage)",
-      "dataset": "employee_load",
-      "x": "employee",
-      "y": "count"
+      "description": "Anteil der verschiedenen Schichtarten an allen geplanten Schichten.",
+      "source": "Schichteinteilung"
     }
   ],
-  "colors": {
-    "primary": "#2E86AB",
-    "secondary": "#E84855",
-    "accent": "#FDBB30",
-    "background": "#F4F6F8",
-    "text": "#1F1F1F"
-  },
-  "layout": {
-    "desktop": [
-      { "component": "kpi", "id": "total_shifts_today", "gridArea": "kpi1" },
-      { "component": "kpi", "id": "coverage_today", "gridArea": "kpi2" },
-      { "component": "kpi", "id": "employees_scheduled_today", "gridArea": "kpi3" },
-      { "component": "chart", "id": "shifts_per_day", "gridArea": "chart1" },
-      { "component": "chart", "id": "shift_type_distribution", "gridArea": "chart2" },
-      { "component": "chart", "id": "employee_load", "gridArea": "chart3" }
-    ],
-    "mobile": [
-      { "component": "kpi", "id": "total_shifts_today" },
-      { "component": "kpi", "id": "coverage_today" },
-      { "component": "kpi", "id": "employees_scheduled_today" },
-      { "component": "chart", "id": "shifts_per_day" },
-      { "component": "chart", "id": "shift_type_distribution" },
-      { "component": "chart", "id": "employee_load" }
-    ]
+  "tables": [
+    {
+      "id": "upcoming_shifts",
+      "label": "Anstehende Schichten (nächste 7 Tage)",
+      "description": "Liste der kommenden Schichten mit Mitarbeiter, Datum und Schichtart.",
+      "source": "Schichteinteilung"
+    }
+  ],
+  "color_scheme": {
+    "primary": "#0d9488",
+    "secondary": "#0ea5e9",
+    "background": "#f8fafc",
+    "card": "#ffffff",
+    "text_primary": "#0f172a"
   }
 }
 
