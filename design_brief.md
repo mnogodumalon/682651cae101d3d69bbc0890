@@ -3,179 +3,210 @@
 ## 1. App Analysis
 
 ### What This App Does
-The Schichtplaner suite manages shift planning for companies. It stores companies, employees, shift types and each individual shift assignment. Managers need a fast overview of upcoming work as well as the ability to add new shifts on-the-go.
+Schichtplaner ist ein Living-Apps-Backend, mit dem Personalverantwortliche ihre Mitarbeiter, Schichtarten und Schichteinteilungen über mehrere Unternehmens­standorte hinweg organisieren. Das Dashboard dient als **Cockpit**, das den aktuellen Einsatzplan auf einen Blick sichtbar macht und tägliche Planungsaufgaben beschleunigt.
 
 ### Who Uses This
-• Office managers and shift supervisors who organise daily staff rotations.  
-• They are not tech-savvy — they expect an at-a-glance view and one tap to add a shift.
+Disponent:innen / Filial­leiter:innen ohne IT-Know-how. Sie öffnen das Dashboard morgens auf dem Tablet oder Laptop, um Schichten zu prüfen, spontan anzupassen und neue Schichten zu erstellen.
 
 ### The ONE Thing Users Care About Most
-“How many shifts are scheduled today?” — they open the dashboard each morning to confirm coverage.
+„Wie viele Schichten stehen **heute** an und sind alle besetzt?“  
+Deshalb wird **Schichten heute** als hero-KPI prominent dargestellt.
 
 ### Primary Actions (IMPORTANT!)
-1. **Schicht anlegen** → Primary Action Button (adds a new `Schichteinteilung` record).  
-2. Inspect upcoming shifts for the week.  
-3. View employee details (secondary drill-down).
+1. **Schicht hinzufügen** → Primary Action Button (öffnet Formular zum Anlegen eines Schichteinteilung-Datensatzes)
+2. Mitarbeiterdetails ansehen
+3. Offene Schichten nachbesetzen
 
 ---
 
 ## 2. What Makes This Design Distinctive
 
 ### Visual Identity
-Warm cream background combined with a terracotta accent (#e06b2d) creates an inviting, slightly tactile feel that fits the human-centred nature of shift planning. Subtle shadows and generous whitespace evoke paper schedule boards while still feeling modern.
+Ein warmer Off-White-Hintergrund mit **Terracotta-Akzent** vermittelt ein menschliches, nahbares Gefühl – passend zur Arbeit mit Menschen & Schichten. Die kräftige Akzentfarbe erscheint ausschließlich auf primären Interaktionen, sodass der Blick sofort versteht, wo gehandelt werden kann.
 
 ### Layout Strategy
-An **asymmetric** layout emphasises the hero KPI on the left, with supporting metrics and a chart on the right. Size variation (large hero card vs small KPI cards) and an accent-coloured progress ring around the hero value create visual interest without clutter.
+Asymmetrischer Aufbau:  
+– Links oben der **Hero-KPI** (Schichten heute) dominiert → 48 px Zahl, 60 % Viewport-Breite.  
+– Rechts daneben eine vertikale Spalte mit drei Secondary-KPIs in gleich hohen Cards.  
+– Darunter ein breites Balkendiagramm (Schichten 7 Tage).  
+– Ganz unten eine Liste „Nächste Schichten“.  
+Größen- und Weißraum-Variation erzeugen Spannung, ohne das Layout zu überladen.
 
 ### Unique Element
-The hero KPI card features a circular progress ring that fills as the day’s scheduled shifts reach 100 %. The ring uses an 8 px stroke with rounded caps and a soft inner shadow, making the number feel tangible and “almost clickable”.
+Der Hero-KPI ist von einem **feinen progress-Ring** (8 px, Rundkappen) umgeben, der den Fortschritt zu „Schichten diese Woche“ live darstellt – ein Game-like Feedback, das im Shift-Management selten zu sehen ist.
 
 ---
 
 ## 3. Theme & Colors
 
 ### Font
-- **Family:** Plus Jakarta Sans  
-- **URL:** `https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;700&display=swap`  
-- **Why this font:** Friendly, professional geometry that remains highly legible at both large and small sizes, adding personality compared to system fonts.
+- **Family:** Space Grotesk  
+- **URL:** `https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;700&display=swap`  
+- **Why this font:** Klare, technisch-moderne Grotesk mit eigenem Charakter – perfekt für numerische KPIs und Tabellendaten.
 
-### Color Palette (all hsl())
+### Color Palette
+Alle Farben als komplette hsl() Funktionen:
 
 | Purpose | Color | CSS Variable |
 |---------|-------|--------------|
-| Page background | `hsl(35 60% 97%)` | `--background` |
-| Main text | `hsl(24 20% 18%)` | `--foreground` |
+| Page background | `hsl(30 33% 97%)` | `--background` |
+| Main text | `hsl(24 15% 15%)` | `--foreground` |
 | Card background | `hsl(0 0% 100%)` | `--card` |
-| Card text | `hsl(24 20% 18%)` | `--card-foreground` |
-| Borders | `hsl(35 30% 85%)` | `--border` |
-| Primary action | `hsl(20 80% 50%)` | `--primary` |
+| Card text | `hsl(24 15% 15%)` | `--card-foreground` |
+| Borders | `hsl(24 20% 90%)` | `--border` |
+| Primary action | `hsl(14 74% 55%)` | `--primary` |
 | Text on primary | `hsl(0 0% 100%)` | `--primary-foreground` |
-| Accent highlight | `hsl(20 80% 50% / 15%)` | `--accent` |
-| Muted background | `hsl(35 60% 94%)` | `--muted` |
-| Muted text | `hsl(24 10% 50%)` | `--muted-foreground` |
-| Success/positive | `hsl(140 45% 45%)` | *(component)* |
-| Error/negative | `hsl(0 70% 50%)` | `--destructive` |
+| Accent highlight | `hsl(36 100% 50%)` | `--accent` |
+| Muted background | `hsl(30 33% 95%)` | `--muted` |
+| Muted text | `hsl(24 8% 40%)` | `--muted-foreground` |
+| Success/positive | `hsl(142 70% 45%)` | (component use) |
+| Error/negative | `hsl(0 70% 52%)` | `--destructive` |
 
 ### Why These Colors
-Terracotta accent echoes bulletin-board pins and emphasises actionable items. Cream background reduces glare compared to stark white and supports long desktop sessions.
+Terracotta (Primary) zieht die Aufmerksamkeit auf Aktionen, während das sanft-warme Off-White Ruhe vermittelt. Das Ergebnis ist freundlich, aber klar fokussiert.
 
 ### Background Treatment
-Plain cream (`--background`) with a **2 % vertical gradient** from 97 % → 98 % lightness adds barely noticeable depth.
+Leicht texturierter Offset-White (2 % Rauschen über CSS-Noise) verhindert sterile Leere und unterstreicht die menschliche Komponente.
 
 ---
 
 ## 4. Mobile Layout (Phone)
 
 ### Layout Approach
-Single-column vertical flow. Hero KPI dominates first viewport (≈60 % height). Secondary KPIs follow in a horizontally scrollable row. Chart then upcoming-shifts list. Primary action button floats bottom-right (FAB) for thumb reach.
+Vertikale Ein-Spalten-Abfolge mit klarer Hierarchie. Der Hero-KPI belegt 60 % der ersten Viewport-Höhe; Secondary-KPIs erscheinen in horizontal scrollbarer Card-Leiste darunter.
 
 ### What Users See (Top to Bottom)
 
-**Header:** App name “Schichtplaner” centred; small settings icon right.  
-**Hero Section:** Circular ring + number of today’s shifts (48 px number). Ring diameter 180 px. Below, label “Schichten heute”.  
-**Section 2 – Quick KPIs:** Horizontal scroll of three small cards (Employees, Shift Types, Shifts diese Woche).  
-**Section 3 – Chart:** Bar chart “Schichten pro Tag (7 Tage)” full-width aspect-ratio 16:9.  
-**Section 4 – Liste:** List of next 5 upcoming shifts (date, employee, shift type).  
-**Bottom FAB:** Terracotta “Schicht anlegen” + plus icon.
+**Header:** Titel „Schichtplan“ links, rechts kleines „+“ Icon (fallback Primary Action)  
+
+**Hero Section (The FIRST thing users see):**  
+– Große Zahl „Schichten heute“ (48 px, weight 700)  
+– Progress-Ring um die Zahl (8 px stroke)  
+– Untertitel „heute geplant“  
+
+**Section 2: Sekundäre KPIs**  
+Horizontal scrollbare Cards (Mitarbeiter heute, Offene Schichten, Schichten Woche)
+
+**Section 3: Schichten 7 Tage**  
+Balkendiagramm, volle Breite
+
+**Section 4: Nächste Schichten**  
+Liste der nächsten 5 Schichten (Datum, Zeit, Mitarbeiter, Schichtart, Unternehmen)
+
+**Bottom Navigation / Action:**  
+Fixierter runder FAB rechts unten (56 px) mit „+“-Symbol → öffnet Formular „Schicht hinzufügen“
 
 ### Mobile-Specific Adaptations
-Cards stack inside scroll; list items use card style with large touch targets (min-height 56 px).
+Sekundär-KPIs als horizontale Scroll-Cards, um Breite zu sparen. Liste erhält Touch-freundliche 56 px Zeilenhöhe.
 
 ### Touch Targets
-All buttons ≥44 px height; FAB diameter 56 px.
+Alle Buttons ≥ 44 × 44 px.
 
-### Interactive Elements
-• Tapping a KPI card scrolls to corresponding section.  
-• Tapping a list item opens record (handled elsewhere).
+### Interactive Elements (if applicable)
+Tap auf Listen-Eintrag öffnet Living-Apps Datensatz in neuem Tab.
 
 ---
 
 ## 5. Desktop Layout
 
 ### Overall Structure
-Two-column grid (16 / 8). Left column contains hero KPI on top, then bar chart. Right column stacks secondary KPIs then upcoming-shifts list. Eye flow: hero → chart → KPIs → list.
+Zwei Spalten:  
+– **Linke 70 %**: Hero-KPI oben, darunter Balkendiagramm, dann Liste  
+– **Rechte 30 %**: Vertikale Stack der drei Secondary-KPIs  
+Augenfluss: Hero → Secondary-KPIs → Chart → Liste.
 
 ### Section Layout
-- **Top left (hero):** 340 × 340 px card with progress ring and big number.  
-- **Below hero:** Bar chart full left-column width.  
-- **Right column top:** Three KPI cards in grid 3 × 1.  
-- **Right column bottom:** Upcoming shifts list (scroll if >8 items).
+• Top area (linke Spalte): Hero-KPI (60 % Breite, 180 px Höhe)  
+• Right column: Secondary-KPIs (je 100 % Breite, 120 px Höhe, 12 px Gap)  
+• Chart: 100 % linke Spalte, 260 px Höhe  
+• Liste: volle linke Spalte unter Chart
 
 ### What Appears on Hover
-• Bar chart bars highlight accent colour and show exact count tooltip.  
-• List rows reveal “Bearbeiten” icon.
+Listen­zeile erhöht Schatten + zeigt kleinen „Externen Link“-Icon.
 
-### Clickable/Interactive Areas
-• KPI cards clickable same as mobile.  
-• List rows clickable.
+### Clickable/Interactive Areas (if applicable)
+• Secondary-KPI „Offene Schichten“ klickbar → Filter Liste auf offene Schichten.  
+• FAB / Primary Action oben rechts im Header.
 
 ---
 
 ## 6. Components
 
-### Hero KPI – “Schichten heute”
+### Hero KPI
 - **Title:** Schichten heute  
-- **Data source:** `Schichteinteilung`  
-- **Calculation:** Count of records where `zuweisung_datum === heute`  
-- **Display:** Large number (48 px, weight 700) inside circular progress ring representing `(count / employees) × 100 %`.  
-- **Context shown:** Sub-label shows “von [totalEmployees] Mitarbeitern”.  
-- **Why this is the hero:** Confirms staffing for current day instantly.
+- **Data source:** Schichteinteilung  
+- **Calculation:** `count(records where zuweisung_datum === today)`  
+- **Display:** 48 px bold Zahl, progress-Ring drumherum  
+- **Context shown:** Innenliegende kleine Beschriftung „von Woche“ zeigt Anteil der Wochen-Schichten (Schichten heute ÷ Schichten Woche).  
+- **Why this is the hero:** Planung startet immer tagesaktuell – Benutzer wollen sofort sehen, wie viel heute ansteht.
 
 ### Secondary KPIs
 
-**Mitarbeiter**  
-- Source: `Mitarbeiterverwaltung`  
-- Calculation: Count of records  
+**Mitarbeiter heute**  
+- Source: Schichteinteilung + Mitarbeiterverwaltung  
+- Calculation: `unique count(zuweisung_mitarbeiter) where zuweisung_datum === today`  
 - Format: number  
-- Display: Small card (title 14 px, number 28 px, users-icon).
+- Display: Card, 28 px Zahl, Icon „users“
 
-**Schichtarten**  
-- Source: `Schichtartenverwaltung`  
-- Calculation: Count of records  
-- Display: same style with schedule-icon.
+**Offene Schichten**  
+- Source: Schichteinteilung  
+- Calculation: `count(records with zuweisung_mitarbeiter == null and date ≤ today+7)`  
+- Format: number  
+- Display: Card, 28 px Zahl, Icon „alert-triangle“ (border accent)  
 
-**Schichten diese Woche**  
-- Source: `Schichteinteilung`  
-- Calculation: Count of records with date in current ISO week.  
-- Display: same style.
+**Schichten Woche**  
+- Source: Schichteinteilung  
+- Calculation: `count(records where date in current_week)`  
+- Format: number  
+- Display: Card, 28 px Zahl, Icon „calendar“
 
-### Chart – “Schichten pro Tag (7 Tage)”
-- **Type:** Bar chart  
-- **What question it answers:** Do we have load spikes this week?  
-- **Data source:** `Schichteinteilung`  
-- **X-axis:** Next 7 calendar days (locale “de”).  
-- **Y-axis:** Anzahl Schichten.  
-- **Mobile simplification:** Bars narrower; tooltip only on tap.
+### Chart
+- **Type:** Bar – Balken sind für absolute Mengen intuitiver als Linien  
+- **Title:** Schichten – nächste 7 Tage  
+- **What question it answers:** „Wie verteilt sich die Arbeitslast in den kommenden Tagen?“  
+- **Data source:** Schichteinteilung  
+- **X-axis:** Datum (YYYY-MM-DD)  
+- **Y-axis:** Anzahl Schichten  
+- **Mobile simplification:** Scroll-snap nach links/rechts für 2 Tage-Chunks
 
-### List – „Bevorstehende Schichten“
-- Purpose: Quick view of next shifts  
-- Source: `Schichteinteilung`  
-- Fields shown: Datum (DD.MM), Mitarbeiter (Vorname Nachname), Schichtart  
-- Mobile style: card list  
-- Desktop style: simple table  
-- Sort: by `zuweisung_datum` ASC  
-- Limit: 10 items (mobile 5).
+### Lists/Tables
+
+**Nächste Schichten**  
+- Purpose: Schneller Überblick + Zugriff  
+- Source: Schichteinteilung (+ Lookups)  
+- Fields shown: Datum, Start-/Ende, Mitarbeitername, Schichtart, Unternehmen  
+- Mobile style: Card-Rows  
+- Desktop style: Tabelle  
+- Sort: ascending by zuweisung_datum, zuweisung_beginn  
+- Limit: 5 Einträge
 
 ### Primary Action Button (REQUIRED!)
-- **Label:** Schicht anlegen  
+
+- **Label:** „Schicht hinzufügen“  
 - **Action:** add_record  
-- **Target app:** `Schichteinteilung`  
-- **What data:** Form asks for Mitarbeiter (lookup), Schichtart (lookup), Datum (date), Beginn, Ende, Notiz  
-- **Mobile position:** fab  
-- **Desktop position:** header (right)  
-- **Why this action:** Creating new shifts is the main daily task for managers.
+- **Target app:** Schichteinteilung  
+- **What data:** zuweisung_datum, zuweisung_schichtart, zuweisung_mitarbeiter, zuweisung_unternehmen, zuweisung_beginn, zuweisung_ende, zuweisung_notiz  
+- **Mobile position:** bottom_fixed (FAB)  
+- **Desktop position:** header (Button rechts)  
+- **Why this action:** Neue Schichten einzuplanen ist die häufigste Tätigkeit im Tagesgeschäft.
 
 ---
 
 ## 7. Visual Details
 
-- **Border Radius:** rounded (8 px)  
-- **Shadows:** subtle 2 px y-offset, 8 px blur, rgba(0,0,0,0.05)  
-- **Spacing:** normal (8-24 px rhythm)  
-- **Animations:**  
-  - Page load: fade-in 150 ms  
-  - Hover effects: card lifts 2 px  
-  - Tap feedback: background accent flashes 60 ms
+### Border Radius
+rounded (8 px)
+
+### Shadows
+subtle (0 px 4 px 6 px - 3 px rgba(0,0,0,0.04))
+
+### Spacing
+normal – 16 px base grid
+
+### Animations
+- **Page load:** fade  
+- **Hover effects:** slight translate-y -2 px + stronger shadow on Cards  
+- **Tap feedback:** opacity 90 % on Buttons
 
 ---
 
@@ -183,43 +214,43 @@ Two-column grid (16 / 8). Left column contains hero KPI on top, then bar chart. 
 
 ```css
 :root {
-  --background: hsl(35 60% 97%);
-  --foreground: hsl(24 20% 18%);
+  --background: hsl(30 33% 97%);
+  --foreground: hsl(24 15% 15%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(24 20% 18%);
+  --card-foreground: hsl(24 15% 15%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(24 20% 18%);
-  --primary: hsl(20 80% 50%);
+  --popover-foreground: hsl(24 15% 15%);
+  --primary: hsl(14 74% 55%);
   --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(35 60% 94%);
-  --secondary-foreground: hsl(24 20% 18%);
-  --muted: hsl(35 60% 94%);
-  --muted-foreground: hsl(24 10% 50%);
-  --accent: hsl(20 80% 50% / 15%);
-  --accent-foreground: hsl(20 80% 45%);
-  --destructive: hsl(0 70% 50%);
-  --border: hsl(35 30% 85%);
-  --input: hsl(35 30% 85%);
-  --ring: hsl(20 80% 50% / 40%);
+  --secondary: hsl(30 33% 95%);
+  --secondary-foreground: hsl(24 15% 15%);
+  --muted: hsl(30 33% 95%);
+  --muted-foreground: hsl(24 8% 40%);
+  --accent: hsl(36 100% 50%);
+  --accent-foreground: hsl(24 15% 15%);
+  --destructive: hsl(0 70% 52%);
+  --border: hsl(24 20% 90%);
+  --input: hsl(24 20% 90%);
+  --ring: hsl(14 74% 55%);
 }
 ```
 
 ---
 
 ## 9. Implementation Checklist
-- [ ] Font link added to `index.html`.  
-- [ ] All CSS variables copied.  
-- [ ] Hero progress ring prominent.  
-- [ ] Mobile FAB present.  
-- [ ] Data calculations correct.  
-- [ ] Loading & error states handled.  
-- [ ] Primary action opens form and creates record.
+- [ ] Font loaded from URL above
+- [ ] All CSS variables copied exactly
+- [ ] Mobile layout matches Section 4
+- [ ] Desktop layout matches Section 5
+- [ ] Hero element is prominent as described
+- [ ] Colors create the mood described in Section 2
 
 ---
 
 ## Quality Checklist
-✔ Distinctive accent and hero ring  
-✔ Clear hierarchy and non-generic layout  
-✔ Mobile and desktop designed separately  
-✔ All required variables and components specified
+- [x] One clear hero element
+- [x] Distinctive terracotta accent
+- [x] Mobile ≠ squeezed desktop
+- [x] Memorable progress-Ring detail
+- [x] Primary action defined and justified
 

@@ -69,7 +69,7 @@ async function main(): Promise<void> {
   // - "o3" / "o3-mini" - Latest reasoning models
   // - "gpt-4.1" - GPT-4.1 
   // - "gpt-5-codex" - Codex-optimized (default)
-  const model = process.env.CODEX_MODEL || "o3"; // Default to o3
+  const model = process.env.CODEX_MODEL || "gpt-5.2-codex"; // Default to o3
   
   // Start a new thread with working directory and full permissions
   logStatus(`[CODEX] Erstelle Thread mit Model: ${model}`);
@@ -177,13 +177,17 @@ Starte JETZT mit Schritt 1!`;
               } else if (typeof content === "string") {
                 log({ type: "think", content: content });
               }
-            } else if (itemType === "function_call" || itemType === "tool_use" || itemType === "tool_call") {
+            } else if (itemType === "function_call" || itemType === "tool_use" || itemType === "tool_call" || 
+                       itemType === "command_execution" || itemType === "file_change") {
               toolCallCount++;
               log({
                 type: "tool",
                 tool: "name" in event.item ? String(event.item.name) : itemType,
                 input: "arguments" in event.item ? String(event.item.arguments) : itemStr,
               });
+            } else if (itemType === "todo_list" || itemType === "agent_message") {
+              // Skip counting these as tool calls - they're agent organization/output
+              log({ type: "think", content: itemStr });
             } else {
               // Log any other item type
               log({ type: "tool", tool: itemType, input: itemStr });
