@@ -4,6 +4,10 @@
  * This is the Codex SDK equivalent of claude_agent.py
  * Uses OpenAI's Codex TypeScript SDK for programmatic control
  * 
+ * Codex auto-loads:
+ * - AGENTS.md (equivalent to CLAUDE.md)
+ * - .codex/skills/ (skill discovery)
+ * 
  * Usage:
  *   npx ts-node codex_agent.ts
  *   # or after build:
@@ -18,8 +22,6 @@
  */
 
 import { Codex } from "@openai/codex-sdk";
-import * as fs from "fs";
-import * as path from "path";
 
 // Output types for streaming to parent process (matches claude_agent.py format)
 interface OutputMessage {
@@ -37,45 +39,6 @@ function log(message: OutputMessage): void {
 
 function logStatus(content: string): void {
   log({ type: "status", content });
-}
-
-/**
- * Load project context like claude_agent.py's setting_sources=["project"]
- * This reads CLAUDE.md and all skill files to inject as context
- */
-function loadProjectContext(workingDir: string): string {
-  const contextParts: string[] = [];
-  
-  // 1. Load CLAUDE.md (main instructions)
-  const claudeMdPath = path.join(workingDir, "CLAUDE.md");
-  if (fs.existsSync(claudeMdPath)) {
-    const claudeMd = fs.readFileSync(claudeMdPath, "utf-8");
-    contextParts.push("# PROJECT INSTRUCTIONS (CLAUDE.md)\n\n" + claudeMd);
-    logStatus(`[CODEX] Loaded CLAUDE.md (${claudeMd.length} chars)`);
-  } else {
-    logStatus("[CODEX] ⚠️ CLAUDE.md not found!");
-  }
-  
-  // 2. Load all skills from .claude/skills/
-  const skillsDir = path.join(workingDir, ".claude", "skills");
-  if (fs.existsSync(skillsDir)) {
-    const skillFolders = fs.readdirSync(skillsDir, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
-    
-    for (const skillFolder of skillFolders) {
-      const skillPath = path.join(skillsDir, skillFolder, "SKILL.md");
-      if (fs.existsSync(skillPath)) {
-        const skillContent = fs.readFileSync(skillPath, "utf-8");
-        contextParts.push(`\n\n# SKILL: ${skillFolder}\n\n${skillContent}`);
-        logStatus(`[CODEX] Loaded skill: ${skillFolder} (${skillContent.length} chars)`);
-      }
-    }
-  } else {
-    logStatus("[CODEX] ⚠️ .claude/skills/ directory not found!");
-  }
-  
-  return contextParts.join("\n\n---\n\n");
 }
 
 async function main(): Promise<void> {
@@ -124,94 +87,45 @@ async function main(): Promise<void> {
   });
   
   logStatus("[CODEX] Thread erstellt mit Full-Auto Mode");
+  logStatus("[CODEX] Codex lädt AGENTS.md und .codex/skills/ automatisch");
 
-  // Load project context (like claude_agent.py's setting_sources=["project"])
-  const workingDir = "/home/user/app";
-  const projectContext = loadProjectContext(workingDir);
-  
-  logStatus(`[CODEX] Loaded project context: ${projectContext.length} chars total`);
-
-  // Build the query based on mode
+  // Build the query based on mode (same as claude_agent.py)
+  // Codex auto-loads AGENTS.md and .codex/skills/ - no manual loading needed!
   let query: string;
 
   if (userPrompt) {
-    // Continue Mode: Custom prompt from user
+    // Continue Mode: Custom prompt from user (same as claude_agent.py)
     logStatus(`[CODEX] Continue-Mode mit User-Prompt: ${userPrompt}`);
     
-    query = `${projectContext}
-
----
-
-🚨 AUFGABE: Du MUSST das existierende Dashboard ändern und deployen!
+    query = `🚨 AUFGABE: Du MUSST das existierende Dashboard ändern und deployen!
 
 User-Anfrage: "${userPrompt}"
 
 PFLICHT-SCHRITTE (alle müssen ausgeführt werden):
 
 1. LESEN: Lies src/pages/Dashboard.tsx um die aktuelle Struktur zu verstehen
-2. ÄNDERN: Implementiere die User-Anfrage gemäß den obigen Skills und Anleitungen
+2. ÄNDERN: Implementiere die User-Anfrage
 3. TESTEN: Führe 'npm run build' aus um sicherzustellen dass es kompiliert
 4. DEPLOYEN: Führe 'npx ts-node deploy_to_github.ts' aus um die Änderungen zu pushen
-   Die Umgebungsvariablen sind bereits gesetzt - NICHT mit Dummy-Werten testen!
 
 ⚠️ KRITISCH:
 - Du MUSST Änderungen am Code machen!
 - Du MUSST am Ende das Deploy-Skript ausführen: npx ts-node deploy_to_github.ts
 - Beende NICHT ohne zu deployen!
 - Analysieren alleine reicht NICHT - du musst HANDELN!
-- KEINE lokalen Test-Repos! Nutze die echten Umgebungsvariablen!
 
 Das Dashboard existiert bereits. Mache NUR die angeforderten Änderungen, nicht mehr.
 Starte JETZT mit Schritt 1!`;
 
   } else {
-    // Build Mode: Create new dashboard
+    // Build Mode: Create new dashboard (same as claude_agent.py)
     logStatus("[CODEX] Build-Mode: Neues Dashboard erstellen");
     
-    query = `${projectContext}
-
----
-
-# DEINE AUFGABE: Dashboard bauen!
-
-Du hast oben alle Anleitungen und Skills erhalten. Jetzt baue das Dashboard!
-
-## SCHRITT 1: App-Struktur verstehen
-Lies app_metadata.json um die App-Struktur und Felder zu verstehen.
-
-## SCHRITT 2: Design erstellen (frontend-design Skill)
-Erstelle design_brief.md mit dem Design für das Dashboard:
-- Welche KPIs sind wichtig?
-- Welche Charts passen zu den Daten?
-- Welches Farbschema?
-- Mobile vs Desktop Layout
-
-Folge dem frontend-design Skill oben GENAU!
-
-## SCHRITT 3: Dashboard implementieren (frontend-impl Skill)
-Erstelle src/pages/Dashboard.tsx basierend auf design_brief.md:
-- Importiere die Types aus src/types/app.ts
-- Nutze den Service aus src/services/livingAppsService.ts
-- Verwende shadcn/ui Komponenten
-- Füge recharts Charts hinzu
-
-Folge dem frontend-impl Skill oben GENAU!
-
-## SCHRITT 4: Build testen
-npm run build
-
-## SCHRITT 5: Deployen
-npx ts-node deploy_to_github.ts
-
-Die Umgebungsvariablen GIT_PUSH_URL, REPO_NAME und LIVINGAPPS_API_KEY sind bereits gesetzt!
-
-⚠️ KRITISCH:
-- Du MUSST Code schreiben! Analysieren alleine reicht NICHT!
-- Du MUSST am Ende deployen mit: npx ts-node deploy_to_github.ts
-- Die Types und Services existieren bereits in src/types/ und src/services/
-- Teste NICHT mit lokalen Dummy-Repos! Nutze die echten Umgebungsvariablen!
-
-STARTE JETZT MIT SCHRITT 1!`;
+    query = 
+      "Use frontend-design Skill to analyse app structure and generate design_brief.md. " +
+      "Build the Dashboard.tsx following design_brief.md exactly. " +
+      "Use existing types and services from src/types/ and src/services/. " +
+      "Deploy when done using: npx ts-node deploy_to_github.ts";
   }
 
   logStatus("[CODEX] Starte Agent...");

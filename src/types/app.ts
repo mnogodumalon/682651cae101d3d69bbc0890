@@ -36,8 +36,8 @@ export interface Schichteinteilung {
     zuweisung_ende?: string;
     zuweisung_mitarbeiter?: string; // applookup -> URL zu 'Mitarbeiterverwaltung' Record
     zuweisung_datum?: string; // Format: YYYY-MM-DD oder ISO String
-    zuweisung_unternehmen?: string; // applookup -> URL zu 'Unternehmensverwaltung' Record
     zuweisung_schichtart?: string; // applookup -> URL zu 'Schichtartenverwaltung' Record
+    zuweisung_unternehmen?: string; // applookup -> URL zu 'Unternehmensverwaltung' Record
   };
 }
 
