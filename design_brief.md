@@ -3,31 +3,31 @@
 ## 1. App Analysis
 
 ### What This App Does
-Dieses System verwaltet Schichten fuer Unternehmen: Mitarbeitende werden bestimmten Schichtarten und Firmen an einem Datum zugewiesen. Die Nutzer muessen schnell sehen, ob heute und in den naechsten Tagen alles besetzt ist, und neue Schichten mit wenigen Klicks eintragen.
+This app manages shift planning for companies: it stores companies, employees, shift types, and individual shift assignments. The dashboard must help a manager see upcoming coverage at a glance and quickly add new assignments without digging into separate screens.
 
 ### Who Uses This
-Teamleitungen und Disponenten, die taeglich Schichten planen und kurzfristig anpassen. Sie brauchen eine klare Tagesansicht, eine Vorschau auf die naechsten Tage und schnelle Eingabe neuer Zuweisungen.
+Operations managers or team leads who schedule staff for different companies and shift types. They are non-technical and want fast answers: What is happening next, how full is the week, and who is assigned.
 
 ### The ONE Thing Users Care About Most
-Ob die Schichten heute (und in den naechsten Tagen) abgedeckt sind und wer als naechstes arbeitet.
+How many shifts are scheduled for the next 7 days (and whether the immediate days look covered). This answers the daily question: "Are we staffed for the coming week?"
 
 ### Primary Actions (IMPORTANT!)
-1. Schicht zuweisen -> Primary Action Button
-2. Mitarbeiter pflegen (selten)
-3. Schichtarten definieren (selten)
+1. Schicht einteilen (create a new shift assignment) -> Primary Action Button
+2. Mitarbeitende pflegen
+3. Schichtarten verwalten
 
 ---
 
 ## 2. What Makes This Design Distinctive
 
 ### Visual Identity
-Ein warmes, papierartiges Grundlayout mit einem kuehlen Petrol als Primarakzent vermittelt Ruhe und Planungssicherheit. Ein einzelner, leuchtender Amber-Akzent markiert Zeitfenster und hebt die aktuelle Tageslast hervor, ohne laut zu wirken.
+The design feels like a calm scheduling desk: warm paper-like background, precise geometric typography, and a deep teal action color. A burnt-orange accent highlights time-critical information, giving the layout a "dispatch board" character without feeling busy.
 
 ### Layout Strategy
-Die Seite ist asymmetrisch: Links dominiert ein grosser Hero-Block fuer die heutige Auslastung, rechts sind die naechsten Schichten als fokussierte Liste. Das erzeugt einen klaren Blickfluss von "Heute" zu "Naechste". Sekundaere KPIs sitzen als schmaler, ruhiger Statistikstreifen darunter, damit sie sichtbar bleiben, aber nicht konkurrieren. Visuelles Interesse entsteht durch die Groessenvariation (Hero gross, KPIs klein), eine horizontale Wochenleiste im Hero und bewusst wechselnde Abstaende zwischen den Bereichen.
+The layout is asymmetric with a wide left column for the hero KPI and the trend chart, and a narrower right column for upcoming shifts and roster lists. The hero is a large numeric block with a custom 7-day "shift ribbon" beneath it, which creates immediate visual interest. Secondary KPIs are compact and arranged in a tight horizontal strip to avoid competing with the hero. Lists on the right column are stacked but visually separated by spacing and subtle borders.
 
 ### Unique Element
-Eine "Week Pulse"-Leiste im Hero: sieben schmale Tageskacheln mit Mini-Zahlen. Der heutige Tag hat eine kuerzere, farbige Unterstreichung in Amber, sodass der Blick sofort auf die aktuelle Auslastung springt.
+The hero card includes a 7-day "shift ribbon": a horizontal strip of seven small bars with day initials, each bar height representing the number of shifts on that day. This micro-visual makes the week feel tangible and breaks the default card grid look.
 
 ---
 
@@ -35,90 +35,101 @@ Eine "Week Pulse"-Leiste im Hero: sieben schmale Tageskacheln mit Mini-Zahlen. D
 
 ### Font
 - **Family:** Space Grotesk
-- **URL:** `https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap`
-- **Why this font:** Modern, technisch klar, aber mit genug Charakter fuer ein professionelles Planungstool.
+- **URL:** `https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap`
+- **Why this font:** Space Grotesk is geometric and modern without feeling sterile. It fits scheduling and operational data while still being friendly.
 
 ### Color Palette
 All colors as complete hsl() functions:
 
 | Purpose | Color | CSS Variable |
 |---------|-------|--------------|
-| Page background | `hsl(36 33% 96%)` | `--background` |
-| Main text | `hsl(210 18% 12%)` | `--foreground` |
+| Page background | `hsl(38 36% 97%)` | `--background` |
+| Main text | `hsl(205 28% 16%)` | `--foreground` |
 | Card background | `hsl(0 0% 100%)` | `--card` |
-| Card text | `hsl(210 18% 12%)` | `--card-foreground` |
-| Borders | `hsl(24 12% 86%)` | `--border` |
-| Primary action | `hsl(192 48% 32%)` | `--primary` |
-| Text on primary | `hsl(0 0% 100%)` | `--primary-foreground` |
-| Accent highlight | `hsl(27 78% 58%)` | `--accent` |
-| Muted background | `hsl(34 26% 93%)` | `--muted` |
-| Muted text | `hsl(210 10% 45%)` | `--muted-foreground` |
-| Success/positive | `hsl(150 45% 38%)` | (component use) |
-| Error/negative | `hsl(0 70% 50%)` | `--destructive` |
+| Card text | `hsl(205 28% 16%)` | `--card-foreground` |
+| Borders | `hsl(28 18% 86%)` | `--border` |
+| Primary action | `hsl(187 54% 26%)` | `--primary` |
+| Text on primary | `hsl(40 30% 98%)` | `--primary-foreground` |
+| Accent highlight | `hsl(24 78% 48%)` | `--accent` |
+| Muted background | `hsl(36 32% 94%)` | `--muted` |
+| Muted text | `hsl(205 16% 42%)` | `--muted-foreground` |
+| Success/positive | `hsl(142 52% 36%)` | (component use) |
+| Error/negative | `hsl(4 78% 52%)` | `--destructive` |
 
 ### Why These Colors
-Der warme Hintergrund nimmt die Hektik aus der Planung. Petrol wirkt verlaesslich und professionell fuer Primaraktionen. Amber dient als einziger heller Akzent fuer den Fokus auf "Heute" und Zeitpunkte.
+A warm off-white base feels calm and human, while deep teal gives strong action contrast. Burnt orange is used sparingly to draw attention to time-sensitive items and the hero ribbon, creating a distinct scheduling-board vibe.
 
 ### Background Treatment
-Ein sanfter Verlauf von `--background` nach `--muted` von oben nach unten, plus zwei sehr weiche, unscharfe Kreise in `--accent` und `--primary` im Hintergrund (niedrige Deckkraft), um Tiefe zu erzeugen.
+Use a subtle layered background: a soft radial glow in the top-left and a faint diagonal linear gradient across the page. This keeps the light theme from feeling flat while staying understated.
 
 ---
 
 ## 4. Mobile Layout (Phone)
 
 ### Layout Approach
-Mobile zeigt zuerst die heutige Auslastung als Hero, darunter die Week Pulse-Leiste als horizontale Scrollreihe. Die naechsten Schichten folgen unmittelbar, damit der Nutzer mit dem Daumen schnell reagieren kann.
+Mobile focuses on a strong vertical flow. The hero KPI dominates the first screen, followed by a horizontal scroll of secondary KPIs. Lists become stacked cards with generous spacing. The primary action is a fixed bottom button for thumb reach.
 
 ### What Users See (Top to Bottom)
 
 **Header:**
-Titel "Schichtplaner" links, kleines Datum rechts (heutiges Datum). Kein weiterer Text.
+Title "Schichtplaner" on the left, current date on the right (small, muted). No secondary actions here on mobile.
 
 **Hero Section (The FIRST thing users see):**
-Grosses Card-Panel mit dem KPI "Schichten heute" (48px Zahl), darunter eine kurze Zeile "Naechste Schicht: <Uhrzeit>". Darunter die Week Pulse-Leiste (7 kleine Kacheln, horizontal scrollbar). Der Hero nimmt ca. 55-60% der ersten Ansicht ein.
+A large card with the KPI "Schichten naechste 7 Tage" in 48px bold. Beneath the number, a short subtitle "geplant" and the 7-day ribbon (day initials with mini bars). This hero should take roughly the top 55-60% of the first viewport.
 
-**Section 2: Naechste Schichten**
-Liste der naechsten 5 Zuweisungen als kompakte Karten: Name, Schichtart, Unternehmen, Datum + Zeit. Jede Karte hat eine kleine farbige Zeitmarke links.
+**Section 2: Schnellkennzahlen**
+A horizontal scroll row of compact KPI cards: "Schichten heute", "Mitarbeiter", "Schichtarten", "Unternehmen". Each card uses smaller numbers (24px) and muted labels.
 
-**Section 3: Schichten in den naechsten 14 Tagen**
-Ein schlanker Area-Chart (ca. 220px hoch) mit Tageszaehlern.
+**Section 3: Wochenverlauf**
+An area chart card titled "Schichten pro Tag" showing the next 7 days. Y-axis labels are minimal; x-axis shows day initials.
 
-**Section 4: Schnellzahlen**
-Drei kleine KPI-Karten nebeneinander (horizontal scrollbar), fuer Mitarbeiter, Unternehmen, Schichtarten.
+**Section 4: Naechste Schichten**
+A vertical list of the next 5 assignments. Each item is a card with date, time range, employee name, company, and shift type. If a note exists, show a small accent dot.
 
-**Section 5: Ohne Zuweisung (7 Tage)**
-Liste der Mitarbeiter ohne Schicht in den naechsten 7 Tagen, als einfache Zeilenkarten.
+**Section 5: Schichtarten**
+A pill-style wrap list of all shift types (name + time range), using a muted background with a thin accent border.
+
+**Section 6: Team & Unternehmen**
+Two small stacked cards: a short list of employees (name + email/phone) and a list of companies (name + city). Limit each list to 4 items.
 
 **Bottom Navigation / Action:**
-Fixed Primary Button am unteren Rand: "Schicht zuweisen".
+A fixed full-width primary button labeled "Schicht einteilen".
 
 ### Mobile-Specific Adaptations
-Chart-Hoehe reduziert, Listen kompakter. Week Pulse wird horizontal gescrollt statt in zwei Reihen.
+- Chart is simplified to 7 days only.
+- Secondary KPIs are horizontal-scroll to avoid shrinking.
+- Lists use cards instead of table rows for touch comfort.
 
 ### Touch Targets
-Buttons mindestens 44px hoch, Listeneintraege vollflaechig anklickbar, aber nur visuelles Feedback (keine Drill-Downs).
+Buttons and list items should be at least 44px tall. The bottom action button should be 56px height.
 
 ### Interactive Elements (if applicable)
-Nur der Primary Action Button oeffnet ein Formular. Listen zeigen kein Detail-Overlay.
+Tapping a shift in the "Naechste Schichten" list opens a details dialog with full info and the note field.
 
 ---
 
 ## 5. Desktop Layout
 
 ### Overall Structure
-Zwei-Spalten-Layout: links 2/3 Breite, rechts 1/3. Der Blick geht zuerst zum Hero links oben, dann zur rechten "Naechste Schichten"-Liste, danach zum Chart unter dem Hero.
+Two-column asymmetric layout: left column about 2/3 width (hero + chart), right column about 1/3 width (lists). Eye flow: hero -> chart -> upcoming shifts -> roster lists.
 
 ### Section Layout
-- **Top area:** Header mit Titel, Datum und Primary Action Button rechts.
-- **Left column:** Hero-Card oben, darunter der 14-Tage-Chart.
-- **Right column:** Naechste Schichten (Listenkarten), darunter "Ohne Zuweisung".
-- **Bottom strip:** Drei kleine KPI-Karten nebeneinander ueber die volle Breite.
+- **Top header:** Title "Schichtplaner" + subtitle "Uebersicht" on the left, primary action button on the right.
+- **Left column:**
+  - Hero KPI card (large, with 7-day ribbon)
+  - Area chart card "Schichten pro Tag" (next 14 days)
+- **Right column:**
+  - "Naechste Schichten" list card (max 6 items)
+  - "Team" list card (4 recent employees)
+  - "Unternehmen" list card (4 companies)
+  - "Schichtarten" pill list card (all shift types)
 
 ### What Appears on Hover
-Karten heben sich leicht an (subtile Schatten) und bekommen eine etwas dunklere Umrandung.
+Upcoming shift list items lift slightly (shadow increase) and reveal the note line if it exists. The accent dot brightens to the accent color.
 
 ### Clickable/Interactive Areas (if applicable)
-Nur der Primary Action Button und das Formular sind interaktiv. Listen sind nicht klickbar.
+- Clicking a shift item opens a detail dialog.
+- The primary action opens a dialog form to add a new shift assignment.
 
 ---
 
@@ -127,89 +138,113 @@ Nur der Primary Action Button und das Formular sind interaktiv. Listen sind nich
 ### Hero KPI
 The MOST important metric that users see first.
 
-- **Title:** Schichten heute
+- **Title:** Schichten naechste 7 Tage
 - **Data source:** Schichteinteilung
-- **Calculation:** Count aller Zuweisungen mit Datum = heute
-- **Display:** Sehr grosse Zahl (48px), darunter eine kleine Zeile mit naechster Schichtzeit. Week Pulse-Leiste darunter.
-- **Context shown:** Mini-Text "Naechste Schicht: HH:MM" und Week Pulse (naechste 7 Tage).
-- **Why this is the hero:** Der Dienstplaner muss sofort sehen, wie voll der heutige Tag ist.
+- **Calculation:** Count of assignments where date is today through today + 6 days
+- **Display:** Large number (48px) with subtitle "geplant" and the 7-day ribbon beneath
+- **Context shown:** Small text line: "Heute: X | Morgen: Y"
+- **Why this is the hero:** It answers the immediate staffing question for the coming week
 
 ### Secondary KPIs
 
+**Schichten heute**
+- Source: Schichteinteilung
+- Calculation: Count of assignments with date = today
+- Format: number
+- Display: Compact card
+
 **Mitarbeiter gesamt**
 - Source: Mitarbeiterverwaltung
-- Calculation: Count
+- Calculation: Count of records
 - Format: number
-- Display: Kleine Card
+- Display: Compact card
 
-**Unternehmen gesamt**
-- Source: Unternehmensverwaltung
-- Calculation: Count
-- Format: number
-- Display: Kleine Card
-
-**Schichtarten gesamt**
+**Schichtarten**
 - Source: Schichtartenverwaltung
-- Calculation: Count
+- Calculation: Count of records
 - Format: number
-- Display: Kleine Card
+- Display: Compact card
 
-### Chart (if applicable)
-- **Type:** Area chart (Trend wirkt weicher und passt zur Planung)
-- **Title:** Schichten in den naechsten 14 Tagen
-- **What question it answers:** Wann ist die naechste starke Auslastung?
+**Unternehmen**
+- Source: Unternehmensverwaltung
+- Calculation: Count of records
+- Format: number
+- Display: Compact card
+
+### Chart
+- **Type:** Area chart (trend focus without harsh edges)
+- **Title:** Schichten pro Tag
+- **What question it answers:** Is the workload rising or falling across the next two weeks?
 - **Data source:** Schichteinteilung
-- **X-axis:** Datum (dd.MM)
-- **Y-axis:** Anzahl Schichten
-- **Mobile simplification:** Weniger Achsenbeschriftungen, Hoehe reduziert.
+- **X-axis:** Date (formatted as dd.MM or day initials on mobile)
+- **Y-axis:** Count of shifts
+- **Mobile simplification:** Show only 7 days, minimal ticks
 
-### Lists/Tables (if applicable)
+### Lists/Tables
 
 **Naechste Schichten**
-- Purpose: Sofort sehen, wer als naechstes arbeitet
-- Source: Schichteinteilung + Mitarbeiterverwaltung + Unternehmensverwaltung + Schichtartenverwaltung
-- Fields shown: Mitarbeitername, Schichtart, Unternehmen, Datum, Beginn-Ende
-- Mobile style: Kartenliste
-- Desktop style: Kartenliste
-- Sort: Nach Datum + Beginn
-- Limit: 5
+- Purpose: Show the immediate roster so managers know who works next
+- Source: Schichteinteilung (joined to Mitarbeiter, Unternehmen, Schichtarten)
+- Fields shown: Date, time range, employee name, company, shift type, note indicator
+- Mobile style: Stacked cards
+- Desktop style: Compact list with hover reveal
+- Sort: Date asc, then time asc
+- Limit: 6 (desktop), 5 (mobile)
 
-**Ohne Zuweisung (7 Tage)**
-- Purpose: Luecken in der Planung erkennen
-- Source: Mitarbeiterverwaltung + Schichteinteilung
-- Fields shown: Mitarbeitername, Kontakt (Email oder Telefon, falls vorhanden)
-- Mobile style: Einfache Zeilenkarten
-- Desktop style: Einfache Zeilenkarten
-- Sort: Alphabetisch
-- Limit: 6
+**Team**
+- Purpose: Quick access to people context
+- Source: Mitarbeiterverwaltung
+- Fields shown: Name, email or phone
+- Mobile style: Small list
+- Desktop style: Compact list
+- Sort: createdat desc
+- Limit: 4
+
+**Unternehmen**
+- Purpose: Keep active companies visible
+- Source: Unternehmensverwaltung
+- Fields shown: Name, PLZ + Ort
+- Mobile style: Small list
+- Desktop style: Compact list
+- Sort: createdat desc
+- Limit: 4
+
+**Schichtarten**
+- Purpose: Quick visual inventory of available shift types
+- Source: Schichtartenverwaltung
+- Fields shown: Name + time range
+- Mobile style: Wrap of pills
+- Desktop style: Wrap of pills
+- Sort: Name asc
+- Limit: all
 
 ### Primary Action Button (REQUIRED!)
 
-- **Label:** Schicht zuweisen
+- **Label:** Schicht einteilen
 - **Action:** add_record
 - **Target app:** Schichteinteilung
-- **What data:** Datum, Beginn, Ende, Mitarbeiter, Unternehmen, Schichtart, Notiz
+- **What data:** Datum, Mitarbeiter, Unternehmen, Schichtart, Beginn, Ende, Notiz
 - **Mobile position:** bottom_fixed
 - **Desktop position:** header
-- **Why this action:** Neue Zuweisungen sind die haeufigste Aufgabe im Schichtplan.
+- **Why this action:** Assigning shifts is the most frequent task in this workflow
 
 ---
 
 ## 7. Visual Details
 
 ### Border Radius
-rounded (12px)
+rounded (8px)
 
 ### Shadows
-subtle, weiche Schatten mit geringer Deckkraft
+subtle, with a soft spread and a slightly warmer tint (shadow increases on hover)
 
 ### Spacing
-spacious - klare Abstaende zwischen Hero, Listen und KPIs
+spacious, with clear separation between sections
 
 ### Animations
-- **Page load:** fade + leichtes Stagger fuer Sektionen
-- **Hover effects:** leichte Schattenverstaerkung
-- **Tap feedback:** leichte Skalierung (0.98) bei Buttons
+- **Page load:** subtle fade + 8px upward motion for the main sections
+- **Hover effects:** cards lift slightly with stronger shadow
+- **Tap feedback:** button press darkens slightly
 
 ---
 
@@ -219,24 +254,24 @@ The implementer MUST copy these values exactly into `src/index.css`:
 
 ```css
 :root {
-  --background: hsl(36 33% 96%);
-  --foreground: hsl(210 18% 12%);
+  --background: hsl(38 36% 97%);
+  --foreground: hsl(205 28% 16%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(210 18% 12%);
+  --card-foreground: hsl(205 28% 16%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(210 18% 12%);
-  --primary: hsl(192 48% 32%);
-  --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(36 20% 92%);
-  --secondary-foreground: hsl(210 18% 18%);
-  --muted: hsl(34 26% 93%);
-  --muted-foreground: hsl(210 10% 45%);
-  --accent: hsl(27 78% 58%);
-  --accent-foreground: hsl(210 18% 12%);
-  --destructive: hsl(0 70% 50%);
-  --border: hsl(24 12% 86%);
-  --input: hsl(24 12% 86%);
-  --ring: hsl(192 48% 32%);
+  --popover-foreground: hsl(205 28% 16%);
+  --primary: hsl(187 54% 26%);
+  --primary-foreground: hsl(40 30% 98%);
+  --secondary: hsl(36 28% 92%);
+  --secondary-foreground: hsl(205 28% 18%);
+  --muted: hsl(36 32% 94%);
+  --muted-foreground: hsl(205 16% 42%);
+  --accent: hsl(24 78% 48%);
+  --accent-foreground: hsl(40 30% 98%);
+  --destructive: hsl(4 78% 52%);
+  --border: hsl(28 18% 86%);
+  --input: hsl(28 18% 86%);
+  --ring: hsl(187 54% 34%);
 }
 ```
 
