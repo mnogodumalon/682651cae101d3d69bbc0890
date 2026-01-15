@@ -43,24 +43,24 @@
 
 :root {
   --radius: 0.75rem;
-  --background: hsl(34 36% 97%);
-  --foreground: hsl(210 18% 18%);
-  --card: hsl(30 20% 99%);
-  --card-foreground: hsl(210 18% 18%);
-  --popover: hsl(30 20% 99%);
-  --popover-foreground: hsl(210 18% 18%);
-  --primary: hsl(18 84% 52%);
+  --background: hsl(36 33% 96%);
+  --foreground: hsl(210 18% 12%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(210 18% 12%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(210 18% 12%);
+  --primary: hsl(192 48% 32%);
   --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(32 30% 92%);
-  --secondary-foreground: hsl(210 18% 22%);
-  --muted: hsl(32 25% 93%);
+  --secondary: hsl(36 20% 92%);
+  --secondary-foreground: hsl(210 18% 18%);
+  --muted: hsl(34 26% 93%);
   --muted-foreground: hsl(210 10% 45%);
-  --accent: hsl(186 55% 35%);
-  --accent-foreground: hsl(0 0% 100%);
-  --destructive: hsl(0 72% 55%);
-  --border: hsl(210 20% 88%);
-  --input: hsl(210 20% 88%);
-  --ring: hsl(186 55% 35%);
+  --accent: hsl(27 78% 58%);
+  --accent-foreground: hsl(210 18% 12%);
+  --destructive: hsl(0 70% 50%);
+  --border: hsl(24 12% 86%);
+  --input: hsl(24 12% 86%);
+  --ring: hsl(192 48% 32%);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -116,6 +116,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: "Space Grotesk", sans-serif;
+    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   }
 }

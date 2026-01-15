@@ -83,7 +83,7 @@ async function main(): Promise<void> {
     sandboxMode: "danger-full-access", // Full file system access
     networkAccessEnabled: true, // Allow network for npm etc
     webSearchEnabled: false, // Don't need web search
-    modelReasoningEffort: "high", // Use more reasoning for complex tasks (valid: low, medium, high)
+    modelReasoningEffort: "xhigh", // Use more reasoning for complex tasks (valid: low, medium, high)
   });
   
   logStatus("[CODEX] Thread erstellt mit Full-Auto Mode");

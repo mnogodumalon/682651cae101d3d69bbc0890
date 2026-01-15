@@ -1,191 +1,202 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { format, addDays, parseISO, isWithinInterval } from 'date-fns'
+import { de } from 'date-fns/locale'
 import {
-  addDays,
-  compareAsc,
-  format,
-  isBefore,
-  isSameDay,
-  isWithinInterval,
-  parseISO,
-  set,
-  startOfToday,
-} from "date-fns"
-import {
-  Area,
   AreaChart,
-  CartesianGrid,
+  Area,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
-} from "recharts"
-import {
-  Building2,
-  CalendarClock,
-  ChevronRight,
-  Layers3,
-  Plus,
-  Users,
-} from "lucide-react"
-
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+  Tooltip,
+} from 'recharts'
+import { AlertCircle, CalendarDays, Clock, Users } from 'lucide-react'
+import { LivingAppsService, createRecordUrl, extractRecordId } from '@/services/livingAppsService'
+import { APP_IDS } from '@/types/app'
+import type {
+  Unternehmensverwaltung,
+  Schichtartenverwaltung,
+  Schichteinteilung,
+  Mitarbeiterverwaltung,
+} from '@/types/app'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
-  EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from '@/components/ui/empty'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Textarea } from "@/components/ui/textarea"
-import { useIsMobile } from "@/hooks/use-mobile"
-import {
-  LivingAppsService,
-  createRecordUrl,
-  extractRecordId,
-} from "@/services/livingAppsService"
-import { APP_IDS } from "@/types/app"
-import type {
-  CreateSchichteinteilung,
-  Mitarbeiterverwaltung,
-  Schichteinteilung,
-  Schichtartenverwaltung,
-  Unternehmensverwaltung,
-} from "@/types/app"
-import { Toaster, toast } from "sonner"
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
-const chartAccent = "hsl(186 55% 35%)"
-
-const emptyFormState = {
-  date: "",
-  start: "",
-  end: "",
-  employeeId: "",
-  companyId: "",
-  shiftTypeId: "",
-  note: "",
+type FormState = {
+  zuweisung_datum: string
+  zuweisung_beginn: string
+  zuweisung_ende: string
+  mitarbeiter_id: string
+  unternehmen_id: string
+  schichtart_id: string
+  zuweisung_notiz: string
 }
 
-type ShiftFormState = typeof emptyFormState
-
-type ShiftWithDateTime = {
-  shift: Schichteinteilung
+type EnrichedAssignment = {
+  record_id: string
   dateTime: Date
+  dateLabel: string
+  timeLabel: string
+  employeeName: string
+  companyName: string
+  shiftTypeName: string
 }
 
-function safeParseDate(dateValue?: string) {
-  if (!dateValue) return null
-  const parsed = parseISO(dateValue)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+const initialFormState: FormState = {
+  zuweisung_datum: '',
+  zuweisung_beginn: '',
+  zuweisung_ende: '',
+  mitarbeiter_id: '',
+  unternehmen_id: '',
+  schichtart_id: '',
+  zuweisung_notiz: '',
 }
 
-function buildShiftDateTime(shift: Schichteinteilung) {
-  const date = safeParseDate(shift.fields.zuweisung_datum)
+function getEmployeeName(employee: Mitarbeiterverwaltung | null) {
+  if (!employee) return 'Unbekannt'
+  const first = employee.fields.mitarbeiter_vorname ?? ''
+  const last = employee.fields.mitarbeiter_nachname ?? ''
+  const full = `${first} ${last}`.trim()
+  return full.length > 0 ? full : 'Unbekannt'
+}
+
+function getCompanyName(company: Unternehmensverwaltung | null) {
+  return company?.fields.unternehmen_name || 'Unbekannt'
+}
+
+function getShiftTypeName(shiftType: Schichtartenverwaltung | null) {
+  return shiftType?.fields.schichtart_name || 'Unbekannt'
+}
+
+function parseAssignmentDateTime(assignment: Schichteinteilung) {
+  const date = assignment.fields.zuweisung_datum
   if (!date) return null
-  const timeValue = shift.fields.zuweisung_beginn
-  if (!timeValue) return set(date, { hours: 12, minutes: 0 })
-  const [hours, minutes] = timeValue.split(":").map((value) => Number(value))
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-    return set(date, { hours: 12, minutes: 0 })
-  }
-  return set(date, { hours, minutes })
+  const time = assignment.fields.zuweisung_beginn || '00:00'
+  return parseISO(`${date}T${time}`)
 }
 
-function formatShiftTimeRange(shift: Schichteinteilung) {
-  const startTime = shift.fields.zuweisung_beginn
-  const endTime = shift.fields.zuweisung_ende
-  if (startTime && endTime) return `${startTime} – ${endTime}`
-  if (startTime) return `${startTime} – offen`
-  if (endTime) return `offen – ${endTime}`
-  return "Zeit offen"
+function formatDateLabel(date: Date) {
+  return format(date, 'dd.MM', { locale: de })
 }
 
-function formatEmployeeName(employee?: Mitarbeiterverwaltung) {
-  if (!employee) return "Nicht zugewiesen"
-  const firstName = employee.fields.mitarbeiter_vorname || ""
-  const lastName = employee.fields.mitarbeiter_nachname || ""
-  const fullName = `${firstName} ${lastName}`.trim()
-  return fullName.length ? fullName : "Unbenannt"
+function formatDayLabel(date: Date) {
+  return format(date, 'EEE', { locale: de })
 }
 
-function formatCompanyName(company?: Unternehmensverwaltung) {
-  return company?.fields.unternehmen_name || "Unternehmen offen"
+function LoadingState() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted">
+      <div className="mx-auto max-w-6xl px-4 pb-20 pt-8">
+        <div className="flex items-start justify-between gap-6">
+          <div className="space-y-3">
+            <Skeleton className="h-8 w-44" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <Skeleton className="h-10 w-40" />
+        </div>
+        <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]">
+          <div className="space-y-6">
+            <Skeleton className="h-[320px] w-full" />
+            <Skeleton className="h-[260px] w-full" />
+          </div>
+          <div className="space-y-6">
+            <Skeleton className="h-[260px] w-full" />
+            <Skeleton className="h-[220px] w-full" />
+          </div>
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-[120px] w-full" />
+          <Skeleton className="h-[120px] w-full" />
+          <Skeleton className="h-[120px] w-full" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
-function formatShiftTypeName(shiftType?: Schichtartenverwaltung) {
-  return shiftType?.fields.schichtart_name || "Schichtart offen"
+function ErrorState({ onRetry, message }: { onRetry: () => void; message: string }) {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted">
+      <div className="mx-auto flex max-w-3xl flex-col items-center px-4 pb-20 pt-24 text-center">
+        <Alert className="w-full">
+          <AlertTitle className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            Fehler beim Laden
+          </AlertTitle>
+          <AlertDescription className="mt-2 text-sm text-muted-foreground">
+            {message}
+          </AlertDescription>
+          <div className="mt-4">
+            <Button onClick={onRetry} className="active:scale-[0.98]">
+              Neu laden
+            </Button>
+          </div>
+        </Alert>
+      </div>
+    </div>
+  )
 }
 
 export default function Dashboard() {
-  const isMobile = useIsMobile()
-  const today = useMemo(() => startOfToday(), [])
-  const weekEnd = useMemo(() => addDays(today, 6), [today])
-
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
   const [companies, setCompanies] = useState<Unternehmensverwaltung[]>([])
   const [shiftTypes, setShiftTypes] = useState<Schichtartenverwaltung[]>([])
-  const [shifts, setShifts] = useState<Schichteinteilung[]>([])
+  const [assignments, setAssignments] = useState<Schichteinteilung[]>([])
   const [employees, setEmployees] = useState<Mitarbeiterverwaltung[]>([])
-
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [formState, setFormState] = useState<ShiftFormState>(emptyFormState)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [formState, setFormState] = useState<FormState>(initialFormState)
   const [formError, setFormError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const [selectedShift, setSelectedShift] = useState<Schichteinteilung | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
-      const [
-        companyData,
-        shiftTypeData,
-        shiftData,
-        employeeData,
-      ] = await Promise.all([
-        LivingAppsService.getUnternehmensverwaltung(),
-        LivingAppsService.getSchichtartenverwaltung(),
-        LivingAppsService.getSchichteinteilung(),
-        LivingAppsService.getMitarbeiterverwaltung(),
-      ])
-
-      setCompanies(companyData)
-      setShiftTypes(shiftTypeData)
-      setShifts(shiftData)
-      setEmployees(employeeData)
+      setLoading(true)
+      setError(null)
+      const [loadedCompanies, loadedShiftTypes, loadedAssignments, loadedEmployees] =
+        await Promise.all([
+          LivingAppsService.getUnternehmensverwaltung(),
+          LivingAppsService.getSchichtartenverwaltung(),
+          LivingAppsService.getSchichteinteilung(),
+          LivingAppsService.getMitarbeiterverwaltung(),
+        ])
+      setCompanies(loadedCompanies)
+      setShiftTypes(loadedShiftTypes)
+      setAssignments(loadedAssignments)
+      setEmployees(loadedEmployees)
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unbekannter Fehler"
-      setError(message)
+      setError(err instanceof Error ? err : new Error('Unbekannter Fehler'))
     } finally {
       setLoading(false)
     }
@@ -207,1005 +218,670 @@ export default function Dashboard() {
     return new Map(shiftTypes.map((shiftType) => [shiftType.record_id, shiftType]))
   }, [shiftTypes])
 
-  const shiftsThisWeek = useMemo(() => {
-    return shifts.filter((shift) => {
-      const date = safeParseDate(shift.fields.zuweisung_datum)
-      if (!date) return false
-      return isWithinInterval(date, { start: today, end: weekEnd })
-    })
-  }, [shifts, today, weekEnd])
-
-  const shiftsToday = useMemo(() => {
-    return shifts.filter((shift) => {
-      const date = safeParseDate(shift.fields.zuweisung_datum)
-      if (!date) return false
-      return isSameDay(date, today)
-    })
-  }, [shifts, today])
-
-  const nextShift = useMemo<ShiftWithDateTime | null>(() => {
+  const today = useMemo(() => {
     const now = new Date()
-    const upcoming = shifts
-      .map((shift) => {
-        const dateTime = buildShiftDateTime(shift)
-        return dateTime ? { shift, dateTime } : null
-      })
-      .filter((entry): entry is ShiftWithDateTime => entry !== null)
-      .filter((entry) => !isBefore(entry.dateTime, now))
-      .sort((a, b) => compareAsc(a.dateTime, b.dateTime))
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  }, [])
 
-    return upcoming[0] || null
-  }, [shifts])
-
-  const shiftCountByDate = useMemo(() => {
-    const map = new Map<string, number>()
-    shifts.forEach((shift) => {
-      const dateValue = shift.fields.zuweisung_datum
-      if (!dateValue) return
-      map.set(dateValue, (map.get(dateValue) || 0) + 1)
+  const countsByDate = useMemo(() => {
+    const counts = new Map<string, number>()
+    assignments.forEach((assignment) => {
+      const date = assignment.fields.zuweisung_datum
+      if (!date) return
+      counts.set(date, (counts.get(date) || 0) + 1)
     })
-    return map
-  }, [shifts])
+    return counts
+  }, [assignments])
+
+  const heroCount = useMemo(() => {
+    const todayKey = format(today, 'yyyy-MM-dd')
+    return countsByDate.get(todayKey) || 0
+  }, [countsByDate, today])
+
+  const weekPulse = useMemo(() => {
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = addDays(today, index)
+      const dateKey = format(date, 'yyyy-MM-dd')
+      return {
+        dateKey,
+        label: formatDayLabel(date),
+        day: format(date, 'dd.MM', { locale: de }),
+        count: countsByDate.get(dateKey) || 0,
+        isToday: index === 0,
+      }
+    })
+  }, [countsByDate, today])
+
+  const upcomingAssignments = useMemo(() => {
+    const enriched: EnrichedAssignment[] = []
+    assignments.forEach((assignment) => {
+      const dateTime = parseAssignmentDateTime(assignment)
+      if (!dateTime) return
+      if (dateTime < today) return
+
+      const employeeId = extractRecordId(assignment.fields.zuweisung_mitarbeiter)
+      const companyId = extractRecordId(assignment.fields.zuweisung_unternehmen)
+      const shiftTypeId = extractRecordId(assignment.fields.zuweisung_schichtart)
+
+      enriched.push({
+        record_id: assignment.record_id,
+        dateTime,
+        dateLabel: formatDateLabel(dateTime),
+        timeLabel: `${assignment.fields.zuweisung_beginn || '--:--'} - ${
+          assignment.fields.zuweisung_ende || '--:--'
+        }`,
+        employeeName: getEmployeeName(
+          employeeId ? employeeMap.get(employeeId) || null : null
+        ),
+        companyName: getCompanyName(companyId ? companyMap.get(companyId) || null : null),
+        shiftTypeName: getShiftTypeName(
+          shiftTypeId ? shiftTypeMap.get(shiftTypeId) || null : null
+        ),
+      })
+    })
+
+    return enriched.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime())
+  }, [assignments, companyMap, employeeMap, shiftTypeMap, today])
+
+  const nextAssignments = upcomingAssignments.slice(0, 5)
+  const nextShiftTime = nextAssignments[0]
+    ? format(nextAssignments[0].dateTime, 'HH:mm')
+    : '--:--'
 
   const chartData = useMemo(() => {
     return Array.from({ length: 14 }, (_, index) => {
       const date = addDays(today, index)
-      const key = format(date, "yyyy-MM-dd")
+      const dateKey = format(date, 'yyyy-MM-dd')
       return {
-        dateLabel: format(date, "dd.MM"),
-        count: shiftCountByDate.get(key) || 0,
+        label: formatDateLabel(date),
+        count: countsByDate.get(dateKey) || 0,
       }
     })
-  }, [today, shiftCountByDate])
+  }, [countsByDate, today])
 
-  const upcomingShifts = useMemo(() => {
-    const now = new Date()
-    return [...shifts]
-      .map((shift) => ({ shift, dateTime: buildShiftDateTime(shift) }))
-      .filter(
-        (entry): entry is ShiftWithDateTime =>
-          entry.dateTime !== null && !isBefore(entry.dateTime, now)
-      )
-      .sort((a, b) => compareAsc(a.dateTime, b.dateTime))
-      .map((entry) => entry.shift)
-      .slice(0, 8)
-  }, [shifts])
+  const unassignedEmployees = useMemo(() => {
+    if (employees.length === 0) return []
+    const interval = { start: today, end: addDays(today, 6) }
+    const assignedEmployeeIds = new Set<string>()
 
-  const employeesSorted = useMemo(() => {
-    return [...employees]
+    assignments.forEach((assignment) => {
+      const dateValue = assignment.fields.zuweisung_datum
+      if (!dateValue) return
+      const date = parseISO(dateValue)
+      if (!isWithinInterval(date, interval)) return
+
+      const employeeId = extractRecordId(assignment.fields.zuweisung_mitarbeiter)
+      if (employeeId) assignedEmployeeIds.add(employeeId)
+    })
+
+    return employees
+      .filter((employee) => !assignedEmployeeIds.has(employee.record_id))
       .sort((a, b) => {
-        const aName = a.fields.mitarbeiter_nachname || ""
-        const bName = b.fields.mitarbeiter_nachname || ""
-        return aName.localeCompare(bName, "de")
+        const nameA = getEmployeeName(a)
+        const nameB = getEmployeeName(b)
+        return nameA.localeCompare(nameB)
       })
-      .slice(0, isMobile ? 4 : 5)
-  }, [employees, isMobile])
+      .slice(0, 6)
+  }, [assignments, employees, today])
 
-  const companiesSorted = useMemo(() => {
-    return [...companies]
-      .sort((a, b) => {
-        const aName = a.fields.unternehmen_name || ""
-        const bName = b.fields.unternehmen_name || ""
-        return aName.localeCompare(bName, "de")
-      })
-      .slice(0, 4)
-  }, [companies])
-
-  const shiftTypesSorted = useMemo(() => {
-    return [...shiftTypes]
-      .sort((a, b) => {
-        const aName = a.fields.schichtart_name || ""
-        const bName = b.fields.schichtart_name || ""
-        return aName.localeCompare(bName, "de")
-      })
-      .slice(0, 4)
-  }, [shiftTypes])
-
-  const nextShiftLabel = useMemo(() => {
-    if (!nextShift) return "Noch keine Schicht geplant"
-    const employeeId = extractRecordId(
-      nextShift.shift.fields.zuweisung_mitarbeiter
-    )
-    const companyId = extractRecordId(
-      nextShift.shift.fields.zuweisung_unternehmen
-    )
-    const shiftTypeId = extractRecordId(
-      nextShift.shift.fields.zuweisung_schichtart
-    )
-
-    const employeeName = formatEmployeeName(
-      employeeId ? employeeMap.get(employeeId) : undefined
-    )
-    const companyName = formatCompanyName(
-      companyId ? companyMap.get(companyId) : undefined
-    )
-    const shiftTypeName = formatShiftTypeName(
-      shiftTypeId ? shiftTypeMap.get(shiftTypeId) : undefined
-    )
-
-    return `${format(nextShift.dateTime, "dd.MM.yyyy")} · ${formatShiftTimeRange(
-      nextShift.shift
-    )} · ${employeeName} · ${companyName} · ${shiftTypeName}`
-  }, [companyMap, employeeMap, nextShift, shiftTypeMap])
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setFormError(null)
+    setSuccessMessage(null)
 
-    if (!formState.date) {
-      setFormError("Bitte ein Datum auswählen.")
+    if (
+      !formState.zuweisung_datum ||
+      !formState.zuweisung_beginn ||
+      !formState.zuweisung_ende ||
+      !formState.mitarbeiter_id ||
+      !formState.unternehmen_id ||
+      !formState.schichtart_id
+    ) {
+      setFormError('Bitte alle Pflichtfelder ausfuellen.')
       return
     }
-    if (!formState.employeeId || !formState.companyId || !formState.shiftTypeId) {
-      setFormError("Bitte Mitarbeiter, Unternehmen und Schichtart auswählen.")
-      return
-    }
 
-    const fields: CreateSchichteinteilung = {
-      zuweisung_datum: formState.date,
-      zuweisung_beginn: formState.start || undefined,
-      zuweisung_ende: formState.end || undefined,
-      zuweisung_notiz: formState.note || undefined,
-      zuweisung_mitarbeiter: createRecordUrl(
-        APP_IDS.MITARBEITERVERWALTUNG,
-        formState.employeeId
-      ),
-      zuweisung_unternehmen: createRecordUrl(
-        APP_IDS.UNTERNEHMENSVERWALTUNG,
-        formState.companyId
-      ),
-      zuweisung_schichtart: createRecordUrl(
-        APP_IDS.SCHICHTARTENVERWALTUNG,
-        formState.shiftTypeId
-      ),
-    }
-
-    setIsSubmitting(true)
     try {
-      await LivingAppsService.createSchichteinteilungEntry(fields)
-      toast.success("Schicht gespeichert", {
-        description: "Die Schichteinteilung wurde erfolgreich angelegt.",
-      })
-      setIsDialogOpen(false)
-      setFormState(emptyFormState)
+      const payload: Schichteinteilung['fields'] = {
+        zuweisung_datum: formState.zuweisung_datum,
+        zuweisung_beginn: formState.zuweisung_beginn,
+        zuweisung_ende: formState.zuweisung_ende,
+        zuweisung_mitarbeiter: createRecordUrl(
+          APP_IDS.MITARBEITERVERWALTUNG,
+          formState.mitarbeiter_id
+        ),
+        zuweisung_unternehmen: createRecordUrl(
+          APP_IDS.UNTERNEHMENSVERWALTUNG,
+          formState.unternehmen_id
+        ),
+        zuweisung_schichtart: createRecordUrl(
+          APP_IDS.SCHICHTARTENVERWALTUNG,
+          formState.schichtart_id
+        ),
+        zuweisung_notiz: formState.zuweisung_notiz || undefined,
+      }
+
+      await LivingAppsService.createSchichteinteilungEntry(payload)
+      setSuccessMessage('Schicht gespeichert.')
+      setFormState(initialFormState)
+      setDialogOpen(false)
       await loadData()
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unbekannter Fehler"
-      setFormError(message)
-    } finally {
-      setIsSubmitting(false)
+      setFormError(
+        err instanceof Error ? err.message : 'Speichern fehlgeschlagen.'
+      )
     }
   }
 
-  return (
-    <div className="relative min-h-screen bg-background text-foreground">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at top left, hsl(186 55% 35% / 0.08), transparent 55%), linear-gradient(hsl(210 20% 88% / 0.35) 1px, transparent 1px), linear-gradient(90deg, hsl(210 20% 88% / 0.35) 1px, transparent 1px)",
-          backgroundSize: "100% 100%, 28px 28px, 28px 28px",
+  if (loading) {
+    return <LoadingState />
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        onRetry={() => {
+          void loadData()
         }}
+        message={error.message}
       />
+    )
+  }
 
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-28 pt-8 md:pb-12 md:pt-10">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Planungshub
-            </p>
-            <h1 className="text-3xl font-semibold md:text-4xl">Schichtplaner</h1>
-            <p className="text-sm text-muted-foreground">
-              Nächste 7 Tage · {format(today, "dd.MM")} – {format(weekEnd, "dd.MM")}
-            </p>
-          </div>
-          <Button
-            className="hidden min-w-[200px] items-center gap-2 transition-transform active:scale-[0.98] md:inline-flex"
-            onClick={() => setIsDialogOpen(true)}
-          >
-            <Plus className="size-4" />
-            Schicht zuweisen
-          </Button>
-        </header>
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted">
+      <div className="relative overflow-hidden">
+        <div className="pointer-events-none absolute -left-16 top-10 h-56 w-56 rounded-full bg-accent/15 blur-3xl" />
+        <div className="pointer-events-none absolute -right-20 top-32 h-72 w-72 rounded-full bg-primary/15 blur-3xl" />
 
-        {error ? (
-          <Alert variant="destructive">
-            <AlertTitle>Fehler beim Laden</AlertTitle>
-            <AlertDescription>
-              <p>Die Daten konnten nicht geladen werden. Bitte erneut versuchen.</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-3 transition-transform active:scale-[0.98]"
-                onClick={loadData}
-              >
-                Erneut versuchen
-              </Button>
-            </AlertDescription>
-          </Alert>
-        ) : null}
-
-        <div className="grid gap-6 md:grid-cols-12">
-          <section className="md:col-span-8">
-            <Card className="relative overflow-hidden shadow-sm transition-shadow duration-300 hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <div className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full bg-accent/10" />
-              <CardHeader className="relative">
-                <CardTitle className="text-lg">Schichten nächste 7 Tage</CardTitle>
-                <CardDescription>
-                  Überblick über die kommende Woche und die nächste Schicht
-                </CardDescription>
-                <div className="absolute right-6 top-6">
-                  <Badge className="bg-accent text-accent-foreground">
-                    Heute: {loading ? "…" : shiftsToday.length}
-                  </Badge>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <div className="relative mx-auto max-w-6xl px-4 pb-24 pt-8 sm:pb-16 sm:pt-10">
+            <header className="flex flex-wrap items-center justify-between gap-4 animate-in fade-in duration-700">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  Uebersicht
+                </p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+                  Schichtplaner
+                </h1>
+                <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                  <CalendarDays className="h-4 w-4" />
+                  {format(today, 'dd.MM.yyyy')}
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {loading ? (
-                  <div className="space-y-4">
-                    <Skeleton className="h-12 w-32" />
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-8 w-full" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="text-5xl font-semibold tracking-tight md:text-6xl">
-                      {shiftsThisWeek.length}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Nächste Schicht: {nextShiftLabel}
-                    </div>
-                    <div className="relative mt-2">
-                      <div className="h-px w-full bg-border/70" />
-                      <div className="absolute inset-x-0 -top-1 flex justify-between">
-                        {Array.from({ length: 7 }).map((_, index) => (
-                          <span
-                            key={`tick-${index}`}
-                            className="h-2 w-px rounded-full bg-border/70"
-                          />
-                        ))}
-                      </div>
-                      <Badge className="absolute -top-4 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground">
-                        Heute
-                      </Badge>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <div className="mt-4 flex gap-3 overflow-x-auto pb-2 md:hidden">
-              {loading ? (
-                Array.from({ length: 3 }).map((_, index) => (
-                  <Skeleton key={`kpi-skel-${index}`} className="h-20 w-40" />
-                ))
-              ) : (
-                <>
-                  <Card className="min-w-[160px] shrink-0 shadow-sm">
-                    <CardContent className="flex items-center justify-between py-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Mitarbeitende</p>
-                        <p className="text-2xl font-semibold">{employees.length}</p>
-                      </div>
-                      <Users className="size-5 text-muted-foreground" />
-                    </CardContent>
-                  </Card>
-                  <Card className="min-w-[160px] shrink-0 shadow-sm">
-                    <CardContent className="flex items-center justify-between py-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Unternehmen</p>
-                        <p className="text-2xl font-semibold">{companies.length}</p>
-                      </div>
-                      <Building2 className="size-5 text-muted-foreground" />
-                    </CardContent>
-                  </Card>
-                  <Card className="min-w-[160px] shrink-0 shadow-sm">
-                    <CardContent className="flex items-center justify-between py-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Schichtarten</p>
-                        <p className="text-2xl font-semibold">{shiftTypes.length}</p>
-                      </div>
-                      <Layers3 className="size-5 text-muted-foreground" />
-                    </CardContent>
-                  </Card>
-                </>
-              )}
-            </div>
-          </section>
-
-          <section className="hidden md:col-span-4 md:grid md:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
-            {loading ? (
-              Array.from({ length: 3 }).map((_, index) => (
-                <Skeleton key={`kpi-${index}`} className="h-24 w-full" />
-              ))
-            ) : (
-              <>
-                <Card className="shadow-sm transition-shadow duration-300 hover:shadow-md">
-                  <CardContent className="flex items-center justify-between py-5">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Mitarbeitende</p>
-                      <p className="text-2xl font-semibold">{employees.length}</p>
-                    </div>
-                    <Users className="size-6 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-                <Card className="shadow-sm transition-shadow duration-300 hover:shadow-md">
-                  <CardContent className="flex items-center justify-between py-5">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Unternehmen</p>
-                      <p className="text-2xl font-semibold">{companies.length}</p>
-                    </div>
-                    <Building2 className="size-6 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-                <Card className="shadow-sm transition-shadow duration-300 hover:shadow-md">
-                  <CardContent className="flex items-center justify-between py-5">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Schichtarten</p>
-                      <p className="text-2xl font-semibold">{shiftTypes.length}</p>
-                    </div>
-                    <Layers3 className="size-6 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-              </>
-            )}
-          </section>
-
-          <section className="md:col-span-8">
-            <Card className="shadow-sm transition-shadow duration-300 hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-              <CardHeader>
-                <CardTitle>Schichten pro Tag (14 Tage)</CardTitle>
-                <CardDescription>
-                  Verlauf der Schichtlast für die kommenden zwei Wochen
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <Skeleton className="h-56 w-full" />
-                ) : error ? (
-                  <Alert variant="destructive">
-                    <AlertTitle>Chart nicht verfügbar</AlertTitle>
-                    <AlertDescription>
-                      <p>Daten konnten nicht geladen werden.</p>
-                    </AlertDescription>
-                  </Alert>
-                ) : chartData.every((entry) => entry.count === 0) ? (
-                  <Empty className="border-dashed">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <CalendarClock className="size-5" />
-                      </EmptyMedia>
-                      <EmptyTitle>Noch keine Schichten</EmptyTitle>
-                      <EmptyDescription>
-                        Lege die erste Schichteinteilung an, um den Verlauf zu sehen.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                    <EmptyContent>
-                      <Button
-                        className="transition-transform active:scale-[0.98]"
-                        onClick={() => setIsDialogOpen(true)}
-                      >
-                        Schicht zuweisen
-                      </Button>
-                    </EmptyContent>
-                  </Empty>
-                ) : (
-                  <div className="h-56 md:h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData} margin={{ left: -10, right: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis
-                          dataKey="dateLabel"
-                          interval={0}
-                          tickFormatter={(value, index) =>
-                            isMobile && index % 2 === 1 ? "" : value
-                          }
-                          tickMargin={8}
-                        />
-                        <YAxis allowDecimals={false} tickMargin={8} />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null
-                            return (
-                              <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-lg">
-                                <div className="font-medium">Schichten</div>
-                                <div>{payload[0]?.value}</div>
-                              </div>
-                            )
-                          }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="count"
-                          stroke={chartAccent}
-                          fill={chartAccent}
-                          fillOpacity={0.2}
-                          strokeWidth={2}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </section>
-
-          <section className="md:col-span-4">
-            <Card className="shadow-sm transition-shadow duration-300 hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-700 delay-250">
-              <CardHeader>
-                <CardTitle>Unternehmen</CardTitle>
-                <CardDescription>Standorte und Firmen im Überblick</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <Skeleton key={`company-${index}`} className="h-16 w-full" />
-                  ))
-                ) : error ? (
-                  <Alert variant="destructive">
-                    <AlertTitle>Unternehmen nicht verfügbar</AlertTitle>
-                    <AlertDescription>
-                      <p>Daten konnten nicht geladen werden.</p>
-                    </AlertDescription>
-                  </Alert>
-                ) : companiesSorted.length === 0 ? (
-                  <Empty className="border-dashed">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <Building2 className="size-5" />
-                      </EmptyMedia>
-                      <EmptyTitle>Noch keine Unternehmen</EmptyTitle>
-                      <EmptyDescription>
-                        Lege zuerst ein Unternehmen an, um Schichten zuzuweisen.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                ) : (
-                  companiesSorted.map((company) => {
-                    const street = company.fields.unternehmen_strasse || ""
-                    const houseNumber = company.fields.unternehmen_hausnummer || ""
-                    const plz = company.fields.unternehmen_plz || ""
-                    const city = company.fields.unternehmen_ort || ""
-                    const addressLine = [street, houseNumber]
-                      .filter(Boolean)
-                      .join(" ")
-                    const locationLine = [plz, city].filter(Boolean).join(" ")
-
-                    return (
-                      <div
-                        key={company.record_id}
-                        className="rounded-lg border border-transparent p-3 transition hover:bg-muted/60"
-                      >
-                        <p className="font-medium">
-                          {company.fields.unternehmen_name || "Unbenannt"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {locationLine || "Ort offen"}
-                        </p>
-                        {addressLine ? (
-                          <p className="text-xs text-muted-foreground">
-                            {addressLine}
-                          </p>
-                        ) : null}
-                      </div>
-                    )
-                  })
-                )}
-              </CardContent>
-            </Card>
-          </section>
-
-          <section className="md:col-span-8">
-            <Card className="shadow-sm transition-shadow duration-300 hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-              <CardHeader>
-                <CardTitle>Anstehende Schichten</CardTitle>
-                <CardDescription>
-                  Datum, Zeiten, Mitarbeitende und Schichtarten im Überblick
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <Skeleton key={`shift-${index}`} className="h-16 w-full" />
-                  ))
-                ) : error ? (
-                  <Alert variant="destructive">
-                    <AlertTitle>Schichten nicht verfügbar</AlertTitle>
-                    <AlertDescription>
-                      <p>Daten konnten nicht geladen werden.</p>
-                    </AlertDescription>
-                  </Alert>
-                ) : upcomingShifts.length === 0 ? (
-                  <Empty className="border-dashed">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <CalendarClock className="size-5" />
-                      </EmptyMedia>
-                      <EmptyTitle>Noch keine Schichten geplant</EmptyTitle>
-                      <EmptyDescription>
-                        Starte mit der ersten Schichteinteilung für dein Team.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                    <EmptyContent>
-                      <Button
-                        className="transition-transform active:scale-[0.98]"
-                        onClick={() => setIsDialogOpen(true)}
-                      >
-                        Schicht zuweisen
-                      </Button>
-                    </EmptyContent>
-                  </Empty>
-                ) : (
-                  upcomingShifts.map((shift) => {
-                    const employeeId = extractRecordId(
-                      shift.fields.zuweisung_mitarbeiter
-                    )
-                    const companyId = extractRecordId(
-                      shift.fields.zuweisung_unternehmen
-                    )
-                    const shiftTypeId = extractRecordId(
-                      shift.fields.zuweisung_schichtart
-                    )
-
-                    const employeeName = formatEmployeeName(
-                      employeeId ? employeeMap.get(employeeId) : undefined
-                    )
-                    const companyName = formatCompanyName(
-                      companyId ? companyMap.get(companyId) : undefined
-                    )
-                    const shiftTypeName = formatShiftTypeName(
-                      shiftTypeId ? shiftTypeMap.get(shiftTypeId) : undefined
-                    )
-                    const dateValue = safeParseDate(
-                      shift.fields.zuweisung_datum
-                    )
-                    const dateLabel = dateValue
-                      ? format(dateValue, "dd.MM.yyyy")
-                      : "Datum offen"
-                    const timeLabel = formatShiftTimeRange(shift)
-
-                    return (
-                      <button
-                        key={shift.record_id}
-                        type="button"
-                        onClick={() => setSelectedShift(shift)}
-                        className="group w-full rounded-lg border border-transparent p-3 text-left transition hover:bg-muted/60 hover:shadow-sm transition-transform active:scale-[0.98]"
-                      >
-                        <div className="grid gap-2 md:grid-cols-[110px_1fr_auto] md:items-center">
-                          <div className="text-sm font-medium text-foreground">
-                            {dateLabel}
-                          </div>
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-semibold">
-                                {timeLabel}
-                              </span>
-                              <span className="text-sm text-foreground">
-                                {employeeName}
-                              </span>
-                              {shift.fields.zuweisung_notiz ? (
-                                <Badge variant="secondary">Notiz</Badge>
-                              ) : null}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {companyName} · {shiftTypeName}
-                            </p>
-                          </div>
-                          <ChevronRight className="ml-auto size-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
-                        </div>
-                      </button>
-                    )
-                  })
-                )}
-              </CardContent>
-            </Card>
-          </section>
-
-          <section className="md:col-span-4">
-            <div className="grid gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-350">
-              <Card className="shadow-sm transition-shadow duration-300 hover:shadow-md">
-                <CardHeader>
-                  <CardTitle>Mitarbeitende</CardTitle>
-                  <CardDescription>Schnellkontakt für Rückfragen</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {loading ? (
-                    Array.from({ length: 3 }).map((_, index) => (
-                      <Skeleton key={`emp-${index}`} className="h-14 w-full" />
-                    ))
-                  ) : error ? (
-                    <Alert variant="destructive">
-                      <AlertTitle>Mitarbeitende nicht verfügbar</AlertTitle>
-                      <AlertDescription>
-                        <p>Daten konnten nicht geladen werden.</p>
-                      </AlertDescription>
-                    </Alert>
-                  ) : employeesSorted.length === 0 ? (
-                    <Empty className="border-dashed">
-                      <EmptyHeader>
-                        <EmptyMedia variant="icon">
-                          <Users className="size-5" />
-                        </EmptyMedia>
-                        <EmptyTitle>Noch kein Team</EmptyTitle>
-                        <EmptyDescription>
-                          Lege Mitarbeitende an, um Schichten zuzuweisen.
-                        </EmptyDescription>
-                      </EmptyHeader>
-                    </Empty>
-                  ) : (
-                    employeesSorted.map((employee) => {
-                      const name = formatEmployeeName(employee)
-                      const contact =
-                        employee.fields.mitarbeiter_email ||
-                        employee.fields.mitarbeiter_telefon ||
-                        "Kontakt offen"
-
-                      return (
-                        <div
-                          key={employee.record_id}
-                          className="rounded-lg border border-transparent p-3 transition hover:bg-muted/60"
-                        >
-                          <p className="font-medium">{name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {contact}
-                          </p>
-                        </div>
-                      )
-                    })
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm transition-shadow duration-300 hover:shadow-md">
-                <CardHeader>
-                  <CardTitle>Schichtarten</CardTitle>
-                  <CardDescription>Verfügbare Zeitfenster</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {loading ? (
-                    Array.from({ length: 3 }).map((_, index) => (
-                      <Skeleton key={`shift-type-${index}`} className="h-14 w-full" />
-                    ))
-                  ) : error ? (
-                    <Alert variant="destructive">
-                      <AlertTitle>Schichtarten nicht verfügbar</AlertTitle>
-                      <AlertDescription>
-                        <p>Daten konnten nicht geladen werden.</p>
-                      </AlertDescription>
-                    </Alert>
-                  ) : shiftTypesSorted.length === 0 ? (
-                    <Empty className="border-dashed">
-                      <EmptyHeader>
-                        <EmptyMedia variant="icon">
-                          <Layers3 className="size-5" />
-                        </EmptyMedia>
-                        <EmptyTitle>Noch keine Schichtarten</EmptyTitle>
-                        <EmptyDescription>
-                          Definiere Schichtarten, um schneller planen zu können.
-                        </EmptyDescription>
-                      </EmptyHeader>
-                    </Empty>
-                  ) : (
-                    shiftTypesSorted.map((shiftType) => {
-                      const range = `${
-                        shiftType.fields.schichtart_beginn || "offen"
-                      } – ${shiftType.fields.schichtart_ende || "offen"}`
-
-                      return (
-                        <div
-                          key={shiftType.record_id}
-                          className="rounded-lg border border-transparent p-3 transition hover:bg-muted/60"
-                        >
-                          <p className="font-medium">
-                            {shiftType.fields.schichtart_name || "Unbenannt"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {range}
-                          </p>
-                        </div>
-                      )
-                    })
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <div
-        className="fixed bottom-4 left-4 right-4 z-40 md:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        <Button
-          className="w-full gap-2 transition-transform active:scale-[0.98]"
-          onClick={() => setIsDialogOpen(true)}
-        >
-          <Plus className="size-4" />
-          Schicht zuweisen
-        </Button>
-      </div>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Schicht zuweisen</DialogTitle>
-            <DialogDescription>
-              Lege Datum, Zeiten und Mitarbeitende für die neue Schicht fest.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="shift-date">Datum</Label>
-              <Input
-                id="shift-date"
-                type="date"
-                value={formState.date}
-                onChange={(event) =>
-                  setFormState((prev) => ({
-                    ...prev,
-                    date: event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="shift-start">Beginn</Label>
-                <Input
-                  id="shift-start"
-                  type="time"
-                  value={formState.start}
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      start: event.target.value,
-                    }))
-                  }
-                />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="shift-end">Ende</Label>
-                <Input
-                  id="shift-end"
-                  type="time"
-                  value={formState.end}
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      end: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label>Mitarbeiter auswählen</Label>
-              <Select
-                value={formState.employeeId || undefined}
-                onValueChange={(value) =>
-                  setFormState((prev) => ({ ...prev, employeeId: value }))
-                }
-                disabled={employees.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={
-                      employees.length
-                        ? "Mitarbeiter auswählen"
-                        : "Keine Mitarbeitenden vorhanden"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees.length ? (
-                    employees.map((employee) => (
-                      <SelectItem
-                        key={employee.record_id}
-                        value={employee.record_id}
-                      >
-                        {formatEmployeeName(employee)}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="no-employees" disabled>
-                      Keine Mitarbeitenden vorhanden
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Unternehmen auswählen</Label>
-              <Select
-                value={formState.companyId || undefined}
-                onValueChange={(value) =>
-                  setFormState((prev) => ({ ...prev, companyId: value }))
-                }
-                disabled={companies.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={
-                      companies.length
-                        ? "Unternehmen auswählen"
-                        : "Keine Unternehmen vorhanden"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.length ? (
-                    companies.map((company) => (
-                      <SelectItem
-                        key={company.record_id}
-                        value={company.record_id}
-                      >
-                        {company.fields.unternehmen_name || "Unbenannt"}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="no-companies" disabled>
-                      Keine Unternehmen vorhanden
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Schichtart auswählen</Label>
-              <Select
-                value={formState.shiftTypeId || undefined}
-                onValueChange={(value) =>
-                  setFormState((prev) => ({ ...prev, shiftTypeId: value }))
-                }
-                disabled={shiftTypes.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={
-                      shiftTypes.length
-                        ? "Schichtart auswählen"
-                        : "Keine Schichtarten vorhanden"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {shiftTypes.length ? (
-                    shiftTypes.map((shiftType) => (
-                      <SelectItem
-                        key={shiftType.record_id}
-                        value={shiftType.record_id}
-                      >
-                        {shiftType.fields.schichtart_name || "Unbenannt"}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="no-shift-types" disabled>
-                      Keine Schichtarten vorhanden
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="shift-note">Notiz</Label>
-              <Textarea
-                id="shift-note"
-                rows={3}
-                value={formState.note}
-                onChange={(event) =>
-                  setFormState((prev) => ({
-                    ...prev,
-                    note: event.target.value,
-                  }))
-                }
-                placeholder="Optional: Hinweise zur Schicht"
-              />
-            </div>
-            {formError ? (
-              <Alert variant="destructive">
-                <AlertTitle>Speichern nicht möglich</AlertTitle>
-                <AlertDescription>{formError}</AlertDescription>
+              <DialogTrigger asChild>
+                <Button className="hidden h-11 px-6 text-sm font-semibold shadow-sm transition active:scale-[0.98] sm:inline-flex">
+                  Schicht zuweisen
+                </Button>
+              </DialogTrigger>
+            </header>
+
+            {successMessage ? (
+              <Alert className="mt-6 animate-in fade-in duration-500">
+                <AlertTitle>Erfolgreich</AlertTitle>
+                <AlertDescription>{successMessage}</AlertDescription>
               </Alert>
             ) : null}
-            <DialogFooter>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="transition-transform active:scale-[0.98]"
-              >
-                {isSubmitting ? "Speichern..." : "Schicht speichern"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
-      <Dialog
-        open={!!selectedShift}
-        onOpenChange={(open) => {
-          if (!open) setSelectedShift(null)
-        }}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Schichtdetails</DialogTitle>
-            <DialogDescription>
-              Alle Details zur ausgewählten Schicht auf einen Blick.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedShift ? (
-            <div className="grid gap-4 text-sm">
-              <div className="grid gap-1">
-                <p className="text-xs text-muted-foreground">Datum</p>
-                <p className="font-medium">
-                  {safeParseDate(selectedShift.fields.zuweisung_datum)
-                    ? format(
-                        safeParseDate(selectedShift.fields.zuweisung_datum)!,
-                        "dd.MM.yyyy"
-                      )
-                    : "Datum offen"}
-                </p>
+            <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]">
+              <div className="flex flex-col gap-6">
+                <Card className="group border-border/70 shadow-sm transition-shadow hover:shadow-md">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Schichten heute
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="text-5xl font-semibold tracking-tight">
+                          {heroCount}
+                        </div>
+                        <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          Naechste Schicht: {nextShiftTime}
+                        </div>
+                      </div>
+                      <div className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-foreground">
+                        Heute
+                      </div>
+                    </div>
+
+                    <div className="mt-6">
+                      <div className="flex items-end gap-2 overflow-x-auto pb-2">
+                        {weekPulse.map((day) => (
+                          <div
+                            key={day.dateKey}
+                            className={cn(
+                              'min-w-[72px] rounded-xl border bg-card px-2 py-2 text-center transition-shadow',
+                              day.isToday
+                                ? 'border-accent/60 shadow-sm'
+                                : 'border-border'
+                            )}
+                          >
+                            <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                              {day.label}
+                            </div>
+                            <div className="mt-1 text-lg font-semibold">
+                              {day.count}
+                            </div>
+                            <div
+                              className={cn(
+                                'mt-2 h-1 rounded-full',
+                                day.isToday
+                                  ? 'mx-auto w-8 bg-accent'
+                                  : 'mx-auto w-6 bg-muted'
+                              )}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/70 shadow-sm transition-shadow hover:shadow-md">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Schichten in den naechsten 14 Tagen
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {assignments.length === 0 ? (
+                      <Empty>
+                        <EmptyHeader>
+                          <EmptyTitle>Keine Schichten geplant</EmptyTitle>
+                          <EmptyDescription>
+                            Erfasse die erste Schicht, um den Trend zu sehen.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
+                    ) : (
+                      <div className="h-[220px] sm:h-[260px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartData}>
+                            <defs>
+                              <linearGradient
+                                id="shiftArea"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="0%"
+                                  stopColor="hsl(var(--primary))"
+                                  stopOpacity={0.35}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor="hsl(var(--primary))"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <XAxis
+                              dataKey="label"
+                              tick={{ fontSize: 11 }}
+                              interval={1}
+                              stroke="hsl(var(--muted-foreground))"
+                            />
+                            <YAxis
+                              tick={{ fontSize: 11 }}
+                              stroke="hsl(var(--muted-foreground))"
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: 'hsl(var(--popover))',
+                                borderColor: 'hsl(var(--border))',
+                                borderRadius: '12px',
+                                fontSize: '12px',
+                              }}
+                              labelStyle={{ color: 'hsl(var(--foreground))' }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="count"
+                              stroke="hsl(var(--primary))"
+                              strokeWidth={2}
+                              fill="url(#shiftArea)"
+                              dot={false}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-              <div className="grid gap-1">
-                <p className="text-xs text-muted-foreground">Zeit</p>
-                <p className="font-medium">
-                  {formatShiftTimeRange(selectedShift)}
-                </p>
-              </div>
-              <div className="grid gap-1">
-                <p className="text-xs text-muted-foreground">Mitarbeiter</p>
-                <p className="font-medium">
-                  {formatEmployeeName(
-                    (() => {
-                      const id = extractRecordId(
-                        selectedShift.fields.zuweisung_mitarbeiter
-                      )
-                      return id ? employeeMap.get(id) : undefined
-                    })()
-                  )}
-                </p>
-              </div>
-              <div className="grid gap-1">
-                <p className="text-xs text-muted-foreground">Unternehmen</p>
-                <p className="font-medium">
-                  {formatCompanyName(
-                    (() => {
-                      const id = extractRecordId(
-                        selectedShift.fields.zuweisung_unternehmen
-                      )
-                      return id ? companyMap.get(id) : undefined
-                    })()
-                  )}
-                </p>
-              </div>
-              <div className="grid gap-1">
-                <p className="text-xs text-muted-foreground">Schichtart</p>
-                <p className="font-medium">
-                  {formatShiftTypeName(
-                    (() => {
-                      const id = extractRecordId(
-                        selectedShift.fields.zuweisung_schichtart
-                      )
-                      return id ? shiftTypeMap.get(id) : undefined
-                    })()
-                  )}
-                </p>
-              </div>
-              <div className="grid gap-1">
-                <p className="text-xs text-muted-foreground">Notiz</p>
-                <p className="font-medium">
-                  {selectedShift.fields.zuweisung_notiz || "Keine Notiz"}
-                </p>
+
+              <div className="flex flex-col gap-6">
+                <Card className="border-border/70 shadow-sm transition-shadow hover:shadow-md">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Naechste Schichten
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {nextAssignments.length === 0 ? (
+                      <Empty>
+                        <EmptyHeader>
+                          <EmptyTitle>Keine Zuweisungen</EmptyTitle>
+                          <EmptyDescription>
+                            Fuege eine neue Schicht hinzu, um loszulegen.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
+                    ) : (
+                      <div className="space-y-3">
+                        {nextAssignments.map((assignment) => (
+                          <div
+                            key={assignment.record_id}
+                            className="flex gap-3 rounded-xl border border-border/70 bg-card p-3 transition-shadow hover:shadow-md"
+                          >
+                            <div className="mt-1 h-10 w-1 rounded-full bg-accent/80" />
+                            <div className="flex-1">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="text-sm font-semibold">
+                                  {assignment.employeeName}
+                                </div>
+                                <Badge variant="secondary">
+                                  {assignment.dateLabel}
+                                </Badge>
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {assignment.shiftTypeName} - {assignment.companyName}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {assignment.timeLabel}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/70 shadow-sm transition-shadow hover:shadow-md">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Ohne Zuweisung (7 Tage)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {employees.length === 0 ? (
+                      <Empty>
+                        <EmptyHeader>
+                          <EmptyTitle>Keine Mitarbeiter</EmptyTitle>
+                          <EmptyDescription>
+                            Lege Mitarbeiter an, um die Planung zu starten.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
+                    ) : unassignedEmployees.length === 0 ? (
+                      <Empty>
+                        <EmptyHeader>
+                          <EmptyTitle>Alle zugewiesen</EmptyTitle>
+                          <EmptyDescription>
+                            Jeder Mitarbeiter hat eine Schicht in den naechsten
+                            Tagen.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
+                    ) : (
+                      <div className="space-y-3">
+                        {unassignedEmployees.map((employee) => {
+                          const contact =
+                            employee.fields.mitarbeiter_email ||
+                            employee.fields.mitarbeiter_telefon ||
+                            'Keine Kontaktdaten'
+                          return (
+                            <div
+                              key={employee.record_id}
+                              className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm transition-shadow hover:shadow-md"
+                            >
+                              <div className="font-semibold">
+                                {getEmployeeName(employee)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {contact}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
 
-      <Toaster position="top-right" richColors />
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Card className="border-border/70 shadow-sm transition-shadow hover:shadow-md">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Mitarbeiter gesamt
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between">
+                  <div className="text-2xl font-semibold">
+                    {employees.length}
+                  </div>
+                  <div className="rounded-full bg-muted p-2 text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-border/70 shadow-sm transition-shadow hover:shadow-md">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Unternehmen gesamt
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between">
+                  <div className="text-2xl font-semibold">
+                    {companies.length}
+                  </div>
+                  <div className="rounded-full bg-muted p-2 text-muted-foreground">
+                    <CalendarDays className="h-4 w-4" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-border/70 shadow-sm transition-shadow hover:shadow-md">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Schichtarten gesamt
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between">
+                  <div className="text-2xl font-semibold">
+                    {shiftTypes.length}
+                  </div>
+                  <div className="rounded-full bg-muted p-2 text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <DialogTrigger asChild>
+              <Button className="fixed bottom-4 left-1/2 z-40 w-[min(92%,420px)] -translate-x-1/2 shadow-lg transition active:scale-[0.98] sm:hidden">
+                Schicht zuweisen
+              </Button>
+            </DialogTrigger>
+          </div>
+
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Schicht zuweisen</DialogTitle>
+            </DialogHeader>
+            <form className="space-y-4" onSubmit={handleSubmit}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="datum">Datum</Label>
+                  <Input
+                    id="datum"
+                    type="date"
+                    value={formState.zuweisung_datum}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        zuweisung_datum: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="beginn">Beginn</Label>
+                  <Input
+                    id="beginn"
+                    type="time"
+                    value={formState.zuweisung_beginn}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        zuweisung_beginn: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ende">Ende</Label>
+                  <Input
+                    id="ende"
+                    type="time"
+                    value={formState.zuweisung_ende}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        zuweisung_ende: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mitarbeiter</Label>
+                  <Select
+                    value={formState.mitarbeiter_id || undefined}
+                    onValueChange={(value) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        mitarbeiter_id: value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Mitarbeiter waehlen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((employee) => (
+                        <SelectItem
+                          key={employee.record_id}
+                          value={employee.record_id}
+                        >
+                          {getEmployeeName(employee)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Unternehmen</Label>
+                  <Select
+                    value={formState.unternehmen_id || undefined}
+                    onValueChange={(value) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        unternehmen_id: value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Unternehmen waehlen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((company) => (
+                        <SelectItem
+                          key={company.record_id}
+                          value={company.record_id}
+                        >
+                          {getCompanyName(company)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Schichtart</Label>
+                  <Select
+                    value={formState.schichtart_id || undefined}
+                    onValueChange={(value) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        schichtart_id: value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Schichtart waehlen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {shiftTypes.map((shiftType) => (
+                        <SelectItem
+                          key={shiftType.record_id}
+                          value={shiftType.record_id}
+                        >
+                          {getShiftTypeName(shiftType)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notiz">Notiz (optional)</Label>
+                <Textarea
+                  id="notiz"
+                  value={formState.zuweisung_notiz}
+                  onChange={(event) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      zuweisung_notiz: event.target.value,
+                    }))
+                  }
+                  rows={3}
+                />
+              </div>
+
+              {formError ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Fehler</AlertTitle>
+                  <AlertDescription>{formError}</AlertDescription>
+                </Alert>
+              ) : null}
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
+                  className="active:scale-[0.98]"
+                >
+                  Abbrechen
+                </Button>
+                <Button type="submit" className="active:scale-[0.98]">
+                  Schicht speichern
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   )
 }
