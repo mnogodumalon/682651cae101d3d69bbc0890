@@ -12,10 +12,10 @@ export function PageShell({ title, subtitle, action, children }: PageShellProps)
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-2xl font-normal">
             {title}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+          <p className="text-base text-foreground mt-1">{subtitle}</p>
         </div>
         {action}
       </div>

@@ -3,7 +3,7 @@ import type { Mitarbeiterverwaltung, Schichtartenverwaltung, Schichteinteilung, 
 import { extractRecordId } from '@/services/livingAppsService';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function resolveDisplay(url: string | undefined, map: Map<string, any>, ...fields: string[]): string {
+function resolveDisplay(url: unknown, map: Map<string, any>, ...fields: string[]): string {
   if (!url) return '';
   const id = extractRecordId(url);
   if (!id) return '';
@@ -13,9 +13,9 @@ function resolveDisplay(url: string | undefined, map: Map<string, any>, ...field
 }
 
 interface SchichteinteilungMaps {
-  mitarbeiterverwaltungMap: Map<string, Mitarbeiterverwaltung>;
   unternehmensverwaltungMap: Map<string, Unternehmensverwaltung>;
   schichtartenverwaltungMap: Map<string, Schichtartenverwaltung>;
+  mitarbeiterverwaltungMap: Map<string, Mitarbeiterverwaltung>;
 }
 
 export function enrichSchichteinteilung(
@@ -24,8 +24,8 @@ export function enrichSchichteinteilung(
 ): EnrichedSchichteinteilung[] {
   return schichteinteilung.map(r => ({
     ...r,
-    zuweisung_mitarbeiterName: resolveDisplay(r.fields.zuweisung_mitarbeiter, maps.mitarbeiterverwaltungMap, 'mitarbeiter_vorname'),
     zuweisung_unternehmenName: resolveDisplay(r.fields.zuweisung_unternehmen, maps.unternehmensverwaltungMap, 'unternehmen_name'),
     zuweisung_schichtartName: resolveDisplay(r.fields.zuweisung_schichtart, maps.schichtartenverwaltungMap, 'schichtart_name'),
+    zuweisung_mitarbeiterName: resolveDisplay(r.fields.zuweisung_mitarbeiter, maps.mitarbeiterverwaltungMap, 'mitarbeiter_vorname'),
   }));
 }

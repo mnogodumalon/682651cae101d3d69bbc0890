@@ -12,11 +12,11 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SchichteinteilungDialog } from '@/components/dialogs/SchichteinteilungDialog';
 import { AI_PHOTO_SCAN } from '@/config/ai-features';
 import {
-  AlertCircle, Plus, ChevronLeft, ChevronRight, Users, Building2, Clock, CalendarDays, Pencil, Trash2
-} from 'lucide-react';
+  IconAlertCircle, IconPlus, IconChevronLeft, IconChevronRight, IconUsers, IconBuilding, IconClock, IconCalendar, IconPencil, IconTrash
+} from '@tabler/icons-react';
 import { useState, useMemo } from 'react';
 import { format, addDays, startOfWeek, isSameDay, parseISO, isToday } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { dateFnsLocale, tx } from '@/i18n';
 
 export default function DashboardOverview() {
   const {
@@ -87,7 +87,7 @@ export default function DashboardOverview() {
     return undefined;
   }, [editRecord, prefillDate]);
 
-  const weekLabel = `${format(weekStart, 'dd.MM', { locale: de })} – ${format(addDays(weekStart, 6), 'dd.MM.yyyy', { locale: de })}`;
+  const weekLabel = `${format(weekStart, 'dd.MM', { locale: dateFnsLocale() })} – ${format(addDays(weekStart, 6), 'dd.MM.yyyy', { locale: dateFnsLocale() })}`;
 
   if (loading) return <DashboardSkeleton />;
   if (error) return <DashboardError error={error} onRetry={fetchAll} />;
@@ -97,39 +97,39 @@ export default function DashboardOverview() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Schichtplan</h1>
-          <p className="text-sm text-muted-foreground">Wochenübersicht · {weekLabel}</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{tx('Schichtplan')}</h1>
+          <p className="text-sm text-muted-foreground">{tx('Wochenübersicht ·')} {weekLabel}</p>
         </div>
         <Button onClick={() => openCreate()} className="gap-2 shrink-0">
-          <Plus size={16} /> Schicht hinzufügen
+          <IconPlus size={16} /> {tx('Schicht hinzufügen')}
         </Button>
       </div>
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          title="Mitarbeiter"
+          title={tx('Mitarbeiter')}
           value={String(mitarbeiterverwaltung.length)}
-          description="Gesamt"
-          icon={<Users size={18} className="text-muted-foreground" />}
+          description={tx('Gesamt')}
+          icon={<IconUsers size={18} className="text-muted-foreground" />}
         />
         <StatCard
-          title="Unternehmen"
+          title={tx('Unternehmen')}
           value={String(unternehmensverwaltung.length)}
-          description="Gesamt"
-          icon={<Building2 size={18} className="text-muted-foreground" />}
+          description={tx('Gesamt')}
+          icon={<IconBuilding size={18} className="text-muted-foreground" />}
         />
         <StatCard
-          title="Schichtarten"
+          title={tx('Schichtarten')}
           value={String(schichtartenverwaltung.length)}
-          description="Definiert"
-          icon={<Clock size={18} className="text-muted-foreground" />}
+          description={tx('Definiert')}
+          icon={<IconClock size={18} className="text-muted-foreground" />}
         />
         <StatCard
-          title="Heute"
+          title={tx('Heute')}
           value={String(todayShifts.length)}
-          description="Schichten"
-          icon={<CalendarDays size={18} className="text-muted-foreground" />}
+          description={tx('Schichten')}
+          icon={<IconCalendar size={18} className="text-muted-foreground" />}
         />
       </div>
 
@@ -141,7 +141,7 @@ export default function DashboardOverview() {
             onClick={() => setWeekOffset(o => o - 1)}
             className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
           >
-            <ChevronLeft size={18} />
+            <IconChevronLeft size={18} />
           </button>
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-foreground">{weekLabel}</span>
@@ -150,7 +150,7 @@ export default function DashboardOverview() {
                 onClick={() => setWeekOffset(0)}
                 className="text-xs text-primary hover:underline"
               >
-                Heute
+                {tx('Heute')}
               </button>
             )}
           </div>
@@ -158,7 +158,7 @@ export default function DashboardOverview() {
             onClick={() => setWeekOffset(o => o + 1)}
             className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
           >
-            <ChevronRight size={18} />
+            <IconChevronRight size={18} />
           </button>
         </div>
 
@@ -173,7 +173,7 @@ export default function DashboardOverview() {
                 {/* Day Header */}
                 <div className={`px-2 py-2 border-b border-border text-center ${today ? 'bg-primary/10' : 'bg-muted/20'}`}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {format(day, 'EEE', { locale: de })}
+                    {format(day, 'EEE', { locale: dateFnsLocale() })}
                   </p>
                   <p className={`text-lg font-bold leading-tight ${today ? 'text-primary' : 'text-foreground'}`}>
                     {format(day, 'd')}
@@ -192,7 +192,7 @@ export default function DashboardOverview() {
                   ))}
                   {dayShifts.length === 0 && (
                     <div className="flex items-center justify-center h-full opacity-0 hover:opacity-100 transition-opacity pt-6">
-                      <span className="text-xs text-muted-foreground">Leer</span>
+                      <span className="text-xs text-muted-foreground">{tx('Leer')}</span>
                     </div>
                   )}
                 </div>
@@ -203,7 +203,7 @@ export default function DashboardOverview() {
                     onClick={() => openCreate(dateStr)}
                     className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
                   >
-                    <Plus size={12} /> Hinzufügen
+                    <IconPlus size={12} /> {tx('Hinzufügen')}
                   </button>
                 </div>
               </div>
@@ -222,15 +222,15 @@ export default function DashboardOverview() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className={`text-sm font-bold ${today ? 'text-primary' : 'text-foreground'}`}>
-                      {format(day, 'EEEE, d. MMM', { locale: de })}
+                      {format(day, 'EEEE, d. MMM', { locale: dateFnsLocale() })}
                     </span>
-                    {today && <Badge variant="outline" className="text-xs border-primary text-primary">Heute</Badge>}
+                    {today && <Badge variant="outline" className="text-xs border-primary text-primary">{tx('Heute')}</Badge>}
                   </div>
                   <button
                     onClick={() => openCreate(dateStr)}
                     className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors border border-border"
                   >
-                    <Plus size={11} /> Schicht
+                    <IconPlus size={11} /> {tx('Schicht')}
                   </button>
                 </div>
                 {dayShifts.length > 0 ? (
@@ -245,7 +245,7 @@ export default function DashboardOverview() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground/60 italic">Keine Schichten</p>
+                  <p className="text-xs text-muted-foreground/60 italic">{tx('Keine Schichten')}</p>
                 )}
               </div>
             );
@@ -267,8 +267,8 @@ export default function DashboardOverview() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Schicht löschen"
-        description={`Schicht von ${deleteTarget?.zuweisung_mitarbeiterName || '—'} am ${deleteTarget?.fields.zuweisung_datum ? formatDate(deleteTarget.fields.zuweisung_datum) : '—'} wirklich löschen?`}
+        title={tx('Schicht löschen')}
+        description={tx`Schicht von ${deleteTarget?.zuweisung_mitarbeiterName || '—'} am ${deleteTarget?.fields.zuweisung_datum ? formatDate(deleteTarget.fields.zuweisung_datum) : '—'} wirklich löschen?`}
         onConfirm={handleDelete}
         onClose={() => setDeleteTarget(null)}
       />
@@ -302,13 +302,13 @@ function ShiftCard({
           onClick={e => { e.stopPropagation(); onEdit(); }}
           className="p-0.5 rounded hover:bg-black/10 transition-colors"
         >
-          <Pencil size={10} />
+          <IconPencil size={10} />
         </button>
         <button
           onClick={e => { e.stopPropagation(); onDelete(); }}
           className="p-0.5 rounded hover:bg-black/10 transition-colors"
         >
-          <Trash2 size={10} />
+          <IconTrash size={10} />
         </button>
       </div>
 
@@ -365,13 +365,13 @@ function DashboardError({ error, onRetry }: { error: Error; onRetry: () => void 
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
       <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center">
-        <AlertCircle size={22} className="text-destructive" />
+        <IconAlertCircle size={22} className="text-destructive" />
       </div>
       <div className="text-center">
-        <h3 className="font-semibold text-foreground mb-1">Fehler beim Laden</h3>
+        <h3 className="font-semibold text-foreground mb-1">{tx('Fehler beim Laden')}</h3>
         <p className="text-sm text-muted-foreground max-w-xs">{error.message}</p>
       </div>
-      <Button variant="outline" size="sm" onClick={onRetry}>Erneut versuchen</Button>
+      <Button variant="outline" size="sm" onClick={onRetry}>{tx('Erneut versuchen')}</Button>
     </div>
   );
 }

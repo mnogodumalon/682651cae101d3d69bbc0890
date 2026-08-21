@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LivingAppsService, extractRecordId, createRecordUrl } from '@/services/livingAppsService';
 import type { Mitarbeiterverwaltung } from '@/types/app';
 import { APP_IDS } from '@/types/app';
@@ -8,19 +9,23 @@ import {
   Table, TableBody, TableCell, TableHead,
   TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Pencil, Trash2, Plus, Search } from 'lucide-react';
+import { IconPencil, IconTrash, IconPlus, IconSearch, IconArrowsUpDown, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
 import { MitarbeiterverwaltungDialog } from '@/components/dialogs/MitarbeiterverwaltungDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PageShell } from '@/components/PageShell';
-import { AI_PHOTO_SCAN } from '@/config/ai-features';
+import { AI_PHOTO_SCAN, AI_PHOTO_LOCATION } from '@/config/ai-features';
+import { t, appLabel, fieldLabel, lookupLabel } from '@/i18n';
 
 export default function MitarbeiterverwaltungPage() {
+  const navigate = useNavigate();
   const [records, setRecords] = useState<Mitarbeiterverwaltung[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<Mitarbeiterverwaltung | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Mitarbeiterverwaltung | null>(null);
+  const [sortKey, setSortKey] = useState('');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => { loadData(); }, []);
 
@@ -56,10 +61,34 @@ export default function MitarbeiterverwaltungPage() {
   const filtered = records.filter(r => {
     if (!search) return true;
     const s = search.toLowerCase();
-    return Object.values(r.fields).some(v =>
-      String(v ?? '').toLowerCase().includes(s)
-    );
+    return Object.values(r.fields).some(v => {
+      if (v == null) return false;
+      if (Array.isArray(v)) return v.some(item => typeof item === 'object' && item !== null && 'label' in item ? String((item as any).label).toLowerCase().includes(s) : String(item).toLowerCase().includes(s));
+      if (typeof v === 'object' && 'label' in (v as any)) return String((v as any).label).toLowerCase().includes(s);
+      return String(v).toLowerCase().includes(s);
+    });
   });
+
+  function toggleSort(key: string) {
+    if (sortKey === key) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else { setSortKey(''); setSortDir('asc'); }
+    } else { setSortKey(key); setSortDir('asc'); }
+  }
+
+  function sortRecords<T extends { fields: Record<string, any> }>(recs: T[]): T[] {
+    if (!sortKey) return recs;
+    return [...recs].sort((a, b) => {
+      let va: any = a.fields[sortKey], vb: any = b.fields[sortKey];
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === 'object' && 'label' in va) va = va.label;
+      if (typeof vb === 'object' && 'label' in vb) vb = vb.label;
+      if (typeof va === 'number' && typeof vb === 'number') return sortDir === 'asc' ? va - vb : vb - va;
+      return sortDir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    });
+  }
 
   if (loading) {
     return (
@@ -71,48 +100,68 @@ export default function MitarbeiterverwaltungPage() {
 
   return (
     <PageShell
-      title="Mitarbeiterverwaltung"
-      subtitle={`${records.length} Mitarbeiterverwaltung im System`}
+      title={appLabel('mitarbeiterverwaltung')}
+      subtitle={`${records.length} ${t('in_system', { entity: appLabel('mitarbeiterverwaltung') })}`}
       action={
-        <Button onClick={() => setDialogOpen(true)} className="shrink-0">
-          <Plus className="h-4 w-4 mr-2" /> Hinzufügen
+        <Button onClick={() => setDialogOpen(true)} className="shrink-0 rounded-full shadow-sm">
+          <IconPlus className="h-4 w-4 mr-2" /> {t('add')}
         </Button>
       }
     >
       <div className="relative w-full max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Mitarbeiterverwaltung suchen..."
+          placeholder={t('search_entity', { entity: appLabel('mitarbeiterverwaltung') })}
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="pl-9"
         />
       </div>
-      <div className="rounded-lg border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Vorname</TableHead>
-              <TableHead>E-Mail-Adresse</TableHead>
-              <TableHead>Telefonnummer</TableHead>
-              <TableHead>Nachname</TableHead>
-              <TableHead className="w-24">Aktionen</TableHead>
+      <div className="rounded-[27px] bg-card shadow-lg overflow-hidden">
+        <Table className="[&_tbody_td]:px-6 [&_tbody_td]:py-2 [&_tbody_td]:text-base [&_tbody_td]:font-medium [&_tbody_tr:first-child_td]:pt-6 [&_tbody_tr:last-child_td]:pb-10">
+          <TableHeader className="bg-secondary">
+            <TableRow className="border-b border-input">
+              <TableHead className="uppercase text-xs font-semibold text-secondary-foreground tracking-wider px-6 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('mitarbeiter_vorname')}>
+                <span className="inline-flex items-center gap-1">
+                  {fieldLabel('mitarbeiterverwaltung', 'mitarbeiter_vorname')}
+                  {sortKey === 'mitarbeiter_vorname' ? (sortDir === 'asc' ? <IconArrowUp size={14} /> : <IconArrowDown size={14} />) : <IconArrowsUpDown size={14} className="opacity-30" />}
+                </span>
+              </TableHead>
+              <TableHead className="uppercase text-xs font-semibold text-secondary-foreground tracking-wider px-6 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('mitarbeiter_telefon')}>
+                <span className="inline-flex items-center gap-1">
+                  {fieldLabel('mitarbeiterverwaltung', 'mitarbeiter_telefon')}
+                  {sortKey === 'mitarbeiter_telefon' ? (sortDir === 'asc' ? <IconArrowUp size={14} /> : <IconArrowDown size={14} />) : <IconArrowsUpDown size={14} className="opacity-30" />}
+                </span>
+              </TableHead>
+              <TableHead className="uppercase text-xs font-semibold text-secondary-foreground tracking-wider px-6 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('mitarbeiter_nachname')}>
+                <span className="inline-flex items-center gap-1">
+                  {fieldLabel('mitarbeiterverwaltung', 'mitarbeiter_nachname')}
+                  {sortKey === 'mitarbeiter_nachname' ? (sortDir === 'asc' ? <IconArrowUp size={14} /> : <IconArrowDown size={14} />) : <IconArrowsUpDown size={14} className="opacity-30" />}
+                </span>
+              </TableHead>
+              <TableHead className="uppercase text-xs font-semibold text-secondary-foreground tracking-wider px-6 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort('mitarbeiter_email')}>
+                <span className="inline-flex items-center gap-1">
+                  {fieldLabel('mitarbeiterverwaltung', 'mitarbeiter_email')}
+                  {sortKey === 'mitarbeiter_email' ? (sortDir === 'asc' ? <IconArrowUp size={14} /> : <IconArrowDown size={14} />) : <IconArrowsUpDown size={14} className="opacity-30" />}
+                </span>
+              </TableHead>
+              <TableHead className="w-24 uppercase text-xs font-semibold text-secondary-foreground tracking-wider px-6">{t('actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map(record => (
-              <TableRow key={record.record_id} className="hover:bg-muted/50 transition-colors">
+            {sortRecords(filtered).map(record => (
+              <TableRow key={record.record_id} className="hover:bg-muted/50 transition-colors cursor-pointer" onClick={(e) => { if ((e.target as HTMLElement).closest('button, [role="checkbox"]')) return; navigate(`/mitarbeiterverwaltung/${record.record_id}`); }}>
                 <TableCell className="font-medium">{record.fields.mitarbeiter_vorname ?? '—'}</TableCell>
-                <TableCell>{record.fields.mitarbeiter_email ?? '—'}</TableCell>
                 <TableCell>{record.fields.mitarbeiter_telefon ?? '—'}</TableCell>
                 <TableCell>{record.fields.mitarbeiter_nachname ?? '—'}</TableCell>
+                <TableCell>{record.fields.mitarbeiter_email ?? '—'}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" onClick={() => setEditingRecord(record)}>
-                      <Pencil className="h-4 w-4" />
+                      <IconPencil className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(record)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <IconTrash className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 </TableCell>
@@ -121,7 +170,7 @@ export default function MitarbeiterverwaltungPage() {
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-16 text-muted-foreground">
-                  {search ? 'Keine Ergebnisse gefunden.' : 'Noch keine Mitarbeiterverwaltung. Jetzt hinzufügen!'}
+                  {search ? t('no_results') : t('no_data_yet', { entity: appLabel('mitarbeiterverwaltung') })}
                 </TableCell>
               </TableRow>
             )}
@@ -134,16 +183,19 @@ export default function MitarbeiterverwaltungPage() {
         onClose={() => { setDialogOpen(false); setEditingRecord(null); }}
         onSubmit={editingRecord ? handleUpdate : handleCreate}
         defaultValues={editingRecord?.fields}
+        recordId={editingRecord?.record_id}
         enablePhotoScan={AI_PHOTO_SCAN['Mitarbeiterverwaltung']}
+        enablePhotoLocation={AI_PHOTO_LOCATION['Mitarbeiterverwaltung']}
       />
 
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Mitarbeiterverwaltung löschen"
-        description="Soll dieser Eintrag wirklich gelöscht werden? Diese Aktion kann nicht rückgängig gemacht werden."
+        title={t('delete_entity', { entity: appLabel('mitarbeiterverwaltung') })}
+        description={t('confirm_delete_desc')}
       />
+
     </PageShell>
   );
 }

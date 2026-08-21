@@ -1,0 +1,25 @@
+{
+  "pages": {
+    "en": {
+      "Definiert": "Defined",
+      "Erneut versuchen": "Retry",
+      "Fehler beim Laden": "Error Loading",
+      "Gesamt": "Total",
+      "Heute": "Today",
+      "Hinzufügen": "Add",
+      "Keine Schichten": "No Shifts",
+      "Leer": "Empty",
+      "Mitarbeiter": "Employee",
+      "Schicht": "Shift",
+      "Schicht hinzufügen": "Add Shift",
+      "Schicht löschen": "Delete Shift",
+      "Schicht von {0} am {1} wirklich löschen?": "Really delete shift of {0} on {1}?",
+      "Schichtarten": "Shift Types",
+      "Schichten": "Shifts",
+      "Schichtplan": "Shift Schedule",
+      "Unternehmen": "Company",
+      "Wochenübersicht ·": "Weekly Overview ·"
+    }
+  },
+  "v": 1
+}

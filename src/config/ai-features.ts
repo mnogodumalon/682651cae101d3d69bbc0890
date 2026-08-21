@@ -10,3 +10,10 @@ export const AI_PHOTO_SCAN: Record<string, boolean> = {
   Schichteinteilung: true,
   Mitarbeiterverwaltung: true,
 };
+
+export const AI_PHOTO_LOCATION: Record<string, boolean> = {
+  Unternehmensverwaltung: true,
+  Schichtartenverwaltung: true,
+  Schichteinteilung: true,
+  Mitarbeiterverwaltung: true,
+};
